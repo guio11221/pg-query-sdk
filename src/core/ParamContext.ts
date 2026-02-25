@@ -1,10 +1,12 @@
 import {Dialect} from "../dialects/Dialect";
 
+type SQLParam = string | number | boolean | Date | null | Buffer | any[]
+
 /**
  * Manages parameters for SQL queries, ensuring proper dialect-specific placeholders.
  */
 export default class ParamContext {
-    private params: any[] = []
+    private params: SQLParam[] = []
 
     /**
      * Creates an instance of ParamContext.
@@ -28,6 +30,12 @@ export default class ParamContext {
      * @returns An array of parameters.
      */
     getParams() {
-        return this.params
+        return Object.freeze([...this.params])
+    }
+
+    clone(): ParamContext {
+        const ctx = new ParamContext(this.dialect)
+        ctx.params = [...this.params]
+        return ctx
     }
 }

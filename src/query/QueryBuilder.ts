@@ -4,6 +4,10 @@ import QueryExecutor from '../core/QueryExecutor'
 import {Dialect} from '../dialects/Dialect'
 
 type JoinType = 'INNER' | 'LEFT' | 'RIGHT'
+type WhereInput<T> =
+    | Partial<T>
+    | Record<string, any>
+    | Array<Record<string, any>>
 
 /**
  * A fluent SQL query builder for constructing and executing database queries.
@@ -84,11 +88,11 @@ export default class QueryBuilder<T = any> {
      * @param fields - An array of field names or keys of T.
      * @returns The current QueryBuilder instance.
      */
-    select(fields: (keyof T | string)[]) {
-        this.fields = fields.map(String)
+    select(fields: (keyof T | string)[] | keyof T | string) {
+        const normalized = Array.isArray(fields) ? fields : [fields]
+        this.fields = normalized.map(String)
         return this
     }
-
     /**
      * Adds a join clause to the query.
      * @param type - The type of join (INNER, LEFT, RIGHT).
@@ -140,7 +144,7 @@ export default class QueryBuilder<T = any> {
      * @param obj - An object where keys are column names and values are the desired values.
      * @returns The current QueryBuilder instance.
      */
-    where(obj: Partial<T>) {
+    where(obj: WhereInput<T>) {
         this.condition.where(obj as any)
         return this
     }
@@ -284,6 +288,10 @@ export default class QueryBuilder<T = any> {
         qb.limitCount = this.limitCount
         qb.offsetCount = this.offsetCount
         qb.ctes = [...this.ctes]
+
+        qb.condition = this.condition.clone()
+        qb.havingCondition = this.havingCondition.clone()
+        qb.ctx = this.ctx.clone()
 
         return qb
     }

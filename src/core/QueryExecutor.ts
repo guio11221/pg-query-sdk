@@ -43,13 +43,19 @@ export default class QueryExecutor {
      * @returns A Promise that resolves to the QueryResult.
      */
     async execute(
-        query: string, params: any[] = [], cacheTTL: number | undefined): Promise<QueryResult> {
+        query: string,
+        params: readonly any[] = [],
+        cacheTTL?: number
+    ): Promise<QueryResult> {
+
+        const normalized = [...params]
+
         if (this.client) {
-            return this.client.query(query, params)
+            return this.client.query(query, normalized)
         }
 
         if (this.pool) {
-            return this.pool.query(query, params)
+            return this.pool.query(query, normalized)
         }
 
         throw new Error('Executor not initialized')

@@ -1,4 +1,5 @@
 import ParamContext from '../core/ParamContext'
+import QueryBuilder from "../builders/QueryBuilder"
 
 type Operator =
     | '='
@@ -10,119 +11,180 @@ type Operator =
     | '<>'
     | 'LIKE'
     | 'ILIKE'
+    | 'IN'
+    | 'NOT IN'
+    | 'BETWEEN'
+    | 'EXISTS'
 
+type ConditionValue =
+    | any
+    | {
+    op: Operator
+    value: any
+}
+
+type ConditionNode = {
+    type: 'AND' | 'OR'
+    expression: string
+}
 /**
  * A builder for constructing SQL WHERE and HAVING clauses.
  */
 export default class ConditionBuilder {
-    private parts: string[] = []
 
-    /**
-     * Creates an instance of ConditionBuilder.
-     * @param ctx - The ParamContext to manage query parameters.
-     */
-    constructor(private ctx: ParamContext) {
-    }
+    private parts: ConditionNode[] = []
 
-    /**
-     * Adds one or more WHERE conditions based on an object.
-     * Supports direct equality, `null` checks, and custom operators.
-     * @param obj - An object where keys are column names and values are the desired values or an object with `op` and `value`.
-     * @returns The current ConditionBuilder instance.
-     */
-    where(obj: Record<string, any>) {
-        Object.entries(obj).forEach(([key, value]) => {
-            if (value === null) {
-                this.parts.push(`${key} IS NULL`)
+    constructor(private ctx: ParamContext) {}
+
+    where(obj: Record<string, ConditionValue>) {
+        Object.entries(obj).forEach(([key, condition]) => {
+
+            if (condition === null) {
+                this.add(`${key} IS NULL`)
                 return
             }
 
-            if (typeof value === 'object' && value !== null && 'op' in value) {
-                const {op, value: v} = value as {
-                    op: Operator
-                    value: any
+            if (typeof condition === 'object'
+                && condition !== null
+                && 'op' in condition) {
+
+                const { op, value } = condition as any
+
+                this.handleOperator(key, op, value)
+                return
+            }
+
+            const placeholder = this.ctx.add(condition)
+            this.add(`${key} = ${placeholder}`)
+        })
+
+        return this
+    }
+
+    private handleOperator(key: string, op: Operator, value: any) {
+
+        const allowed: Operator[] = [
+            '=', '>', '<', '>=', '<=', '!=', '<>',
+            'LIKE', 'ILIKE',
+            'IN', 'NOT IN',
+            'BETWEEN', 'EXISTS'
+        ]
+
+        if (!allowed.includes(op)) {
+            throw new Error(`Invalid operator ${op}`)
+        }
+
+        switch (op) {
+
+            case 'IN':
+            case 'NOT IN': {
+
+                if (!Array.isArray(value)) {
+                    throw new Error(`${op} expects array`)
                 }
 
-                const placeholder = this.ctx.add(v)
-                this.parts.push(`${key} ${op} ${placeholder}`)
-                return
+                const placeholders =
+                    value.map(v => this.ctx.add(v)).join(', ')
+
+                this.add(`${key} ${op} (${placeholders})`)
+                break
             }
 
-            const placeholder = this.ctx.add(value)
-            this.parts.push(`${key} = ${placeholder}`)
-        })
+            case 'BETWEEN': {
 
-        return this
+                if (!Array.isArray(value) || value.length !== 2) {
+                    throw new Error('BETWEEN expects [min,max]')
+                }
+
+                const p1 = this.ctx.add(value[0])
+                const p2 = this.ctx.add(value[1])
+
+                this.add(`${key} BETWEEN ${p1} AND ${p2}`)
+                break
+            }
+
+            case 'EXISTS': {
+
+                if (!(value instanceof QueryBuilder)) {
+                    throw new Error('EXISTS expects QueryBuilder')
+                }
+
+                const { query, params } = value.build()
+                params.forEach(p => this.ctx.add(p))
+
+                this.add(`EXISTS (${query})`)
+                break
+            }
+
+            default: {
+                const placeholder = this.ctx.add(value)
+                this.add(`${key} ${op} ${placeholder}`)
+            }
+        }
     }
 
-    /**
-     * Adds a raw SQL expression to the conditions.
-     * @param expression - The raw SQL expression.
-     * @returns The current ConditionBuilder instance.
-     */
+    private add(expression: string, type: 'AND' | 'OR' = 'AND') {
+        this.parts.push({ type, expression })
+    }
+
     raw(expression: string) {
-        this.parts.push(expression)
+        this.add(expression)
         return this
     }
 
-    /**
-     * Adds a group of conditions connected by AND.
-     * @param cb - A callback function that receives a nested ConditionBuilder to define conditions within the group.
-     * @returns The current ConditionBuilder instance.
-     */
     andGroup(cb: (qb: ConditionBuilder) => void) {
+
         const nested = new ConditionBuilder(this.ctx)
         cb(nested)
 
         const built = nested.build()
-        if (built) {
-            this.parts.push(`(${built.replace(/^WHERE\s/, '')})`)
-        }
+        if (!built) return this
+
+        this.add(`(${built.replace(/^WHERE\s/, '')})`, 'AND')
 
         return this
     }
 
-    /**
-     * Adds a group of conditions connected by OR.
-     * @param cb - A callback function that receives a nested ConditionBuilder to define conditions within the group.
-     * @returns The current ConditionBuilder instance.
-     */
     orGroup(cb: (qb: ConditionBuilder) => void) {
+
         const nested = new ConditionBuilder(this.ctx)
         cb(nested)
 
         const built = nested.build()
-        if (built) {
-            const clean = built.replace(/^WHERE\s/, '')
-            this.parts.push(`OR (${clean})`)
-        }
+        if (!built) return this
+
+        this.add(`(${built.replace(/^WHERE\s/, '')})`, 'OR')
 
         return this
     }
 
-    /**
-     * Builds the SQL condition string.
-     * @param prefix - The prefix for the condition (e.g., 'WHERE', 'HAVING'). Defaults to 'WHERE'.
-     * @returns The built SQL condition string, or an empty string if no conditions were added.
-     */
+    clone(): ConditionBuilder {
+
+        const cloned = new ConditionBuilder(this.ctx)
+
+        cloned.parts = this.parts.map(p => ({
+            ...p
+        }))
+
+        return cloned
+    }
+
     build(prefix = 'WHERE'): string {
+
         if (!this.parts.length) return ''
 
-        const normalized: string[] = []
+        let sql = ''
 
         this.parts.forEach((part, index) => {
+
             if (index === 0) {
-                normalized.push(part)
-                return
+                sql += part.expression
+            } else {
+                sql += ` ${part.type} ${part.expression}`
             }
 
-            if (part.startsWith('OR ')) {
-                normalized.push(part)
-            } else {
-                normalized.push(`AND ${part}`)
-            }
         })
 
-        return `${prefix} ${normalized.join(' ')}`
+        return `${prefix} ${sql}`
     }
 }
