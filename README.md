@@ -42,8 +42,6 @@ const db = new Database({
 });
 ```
 
----
-
 ## 🛠 Core Functionalities
 
 ### 1️⃣ QueryBuilder: Fluent SQL `SELECT` Query Construction
@@ -76,7 +74,7 @@ selectExample();
 The `ConditionBuilder` facilitates the creation of complex conditional logic within `WHERE` and `HAVING` clauses, typically used in conjunction with the `QueryBuilder`.
 
 ```typescript
-import { Database } from 'pg-query-sdk';
+import {Database} from 'pg-query-sdk';
 
 const db = new Database({
     connectionString: 'postgres://user:pass@localhost:5432/your_database',
@@ -88,29 +86,13 @@ async function complexWhereExample() {
         .table('products')
         .select(['name', 'price'])
         .where(conditions => {
-
             conditions
-                .where({ category: 'electronics' })
+                .where({category: 'electronics'})
                 .orGroup(group => {
-
-                    group
-                        .where({
-                            price: {
-                                op: '<',
-                                value: 100
-                            }
-                        })
-                        .where({
-                            stock: {
-                                op: '>',
-                                value: 0
-                            }
-                        })
-
+                    group.where({price: {op: '<', value: 100}})
+                        .where({stock: {op: '>', value: 0}})
                 })
-
-        })
-        .execute()
+        }).execute()
 
     console.log('Complex WHERE Products:', products)
 }
