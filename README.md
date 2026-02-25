@@ -1,7 +1,14 @@
+# PG QUERY SDK (TypeScript)
 
-# pg-query-sdk
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.0-blue.svg)](https://www.typescriptlang.org/)
+[![Architecture: Hexagonal](https://img.shields.io/badge/Architecture-Hexagonal-green.svg)](#-arquitetura)
 
-PostgreSQL SDK com suporte a:
+Uma biblioteca robusta e tipada para integração com banco de dados **PostgresSQL**. Construída sob os princípios da **Arquitetura Hexagonal**, garantindo que sua integração seja escalável, testável e fácil de manter.
+
+
+
+**PostgreSQL** SDK com suporte a:
 
 - Query Builder fluente
 - Executor baseado em Pool
@@ -21,8 +28,6 @@ Ou localmente:
 ```bash
 npm install .
 ```
-
----
 
 # 🏗 Arquitetura
 
@@ -157,15 +162,7 @@ Gera:
 - dist/cjs (CommonJS)
 - dist/esm (ESModule)
 
----
 
-# 🧪 Teste
-
-```bash
-node test/test.js
-```
-
----
 
 # 📌 Responsabilidades
 
@@ -183,21 +180,8 @@ node test/test.js
 - Pool gerenciado automaticamente
 - Conexões sempre liberadas no finally
 
----
 
-# 🚀 Próximos Passos
 
-Possíveis evoluções:
+## 📄 Licença
 
-- WHERE builder parametrizado
-- UPSERT helper
-- TransactionManager
-- Temp tables builder
-- Logger middleware
-- Observabilidade (tracing)
-
----
-
-# 📄 Licença
-
-MIT
+Distribuído sob a licença MIT. Veja \`LICENSE\` para mais informações.
