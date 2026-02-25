@@ -8,14 +8,14 @@ Uma biblioteca robusta e tipada para integração com banco de dados **PostgresS
 
 **PostgreSQL** SDK com suporte a:
 
-- **`Database`**: Ponto de entrada central para todas as operações.
-- **`QueryBuilder`**: Construtor de queries SQL fluente.
-- **`ConditionBuilder`**: Construtor de cláusulas `WHERE` complexas.
-- **`QueryExecutor`**: Executor de queries baseado em Pool de conexões.
-- **ORM Básico**: Com `Repository` para abstração de acesso a dados.
-- **Transações**: Gerenciamento de transações ACID.
-- Compatível com CommonJS e ESM.
-- Dual build (CJS + ESM).
+-   **`Database`**: Ponto de entrada central para todas as operações.
+-   **`QueryBuilder`**: Construtor de queries SQL fluente para **SELECT**.
+-   **`ConditionBuilder`**: Construtor de cláusulas `WHERE` e `HAVING` complexas.
+-   **`QueryExecutor`**: Executor de queries baseado em Pool de conexões.
+-   **ORM Básico**: Com `Repository` para abstração de acesso a dados (atualmente apenas `findById` implementado na base).
+-   **Transações**: Gerenciamento de transações ACID.
+-   Compatível com CommonJS e ESM.
+-   Dual build (CJS + ESM).
 
 ---
 
@@ -46,7 +46,7 @@ const db = new Database({
   connectionString: 'postgres://user:pass@localhost:5432/your_database',
   // Opcional: Você pode especificar um dialeto diferente se necessário
   // dialect: new MyCustomDialect(),
-  // Opcional: TTL padrão para cache de queries (em segundos)
+  // Opcional: TTL padrão para cache de queries (em segundos). Use 0 para desativar.
   // defaultCacheTTL: 300
 });
 
@@ -57,11 +57,11 @@ const db = new Database({
 
 # 🛠 Funcionalidades Principais
 
-## 1️⃣ QueryBuilder: Construindo Queries SQL
+## 1️⃣ QueryBuilder: Construindo Queries SQL (SELECT)
 
-O `QueryBuilder` permite construir queries SQL de forma programática e segura. Ele é acessado através do método `table()` da sua instância `Database`.
+O `QueryBuilder` permite construir queries SQL de forma programática e segura, **focando em operações de seleção de dados**. Ele é acessado através do método `table()` da sua instância `Database`.
 
-Ele **não executa nada**, apenas retorna a string SQL e os parâmetros.
+Ele **não executa nada**, apenas retorna a string SQL e os parâmetros. Para executar a query, você deve encadear `.execute()` no final.
 
 ### Selecionando Dados
 
@@ -73,20 +73,21 @@ const db = new Database({
 });
 
 async function selectExample() {
+  // Construindo a query
   const { query, params } = db.table('users')
     .select(['id', 'name', 'email'])
     .where({ active: true })
     .limit(10)
     .offset(0)
     .orderBy('name', 'ASC')
-    .build();
+    .build(); // Apenas constrói a query, não executa
 
   console.log('SELECT Query:', query);
   // Ex: SELECT id, name, email FROM users WHERE active = $1 ORDER BY name ASC LIMIT 10 OFFSET 0
   console.log('SELECT Params:', params);
   // Ex: [true]
 
-  // Para executar a query, você usaria o .execute() no final da cadeia
+  // Executando a query
   const users = await db.table('users')
     .select(['id', 'name', 'email'])
     .where({ active: true })
@@ -101,7 +102,7 @@ async function selectExample() {
 selectExample();
 ```
 
-### Inserindo Dados
+### Joins
 
 ```typescript
 import Database from 'pg-query-sdk';
@@ -110,31 +111,28 @@ const db = new Database({
   connectionString: 'postgres://user:pass@localhost:5432/your_database',
 });
 
-async function insertExample() {
-  const newUser = { name: 'Alice', email: 'alice@example.com', age: 30 };
-
-  const { query, params } = db.table('users')
-    .insert(newUser)
-    .returning(['id', 'name']) // Retorna as colunas 'id' e 'name' do registro inserido
-    .build();
-
-  console.log('INSERT Query:', query);
-  // Ex: INSERT INTO users (name, email, age) VALUES ($1, $2, $3) RETURNING id, name
-  console.log('INSERT Params:', params);
-  // Ex: ['Alice', 'alice@example.com', 30]
-
-  const insertedUser = await db.table('users')
-    .insert(newUser)
-    .returning(['id', 'name'])
+async function joinExample() {
+  const usersWithOrders = await db.table('users')
+    .select(['users.name', 'orders.amount', 'orders.status'])
+    .join('orders', 'users.id', 'orders.user_id') // INNER JOIN
+    .where({ 'orders.status': 'completed' })
     .execute();
 
-  console.log('Inserted User:', insertedUser[0]); // Retorna um array, pegamos o primeiro elemento
+  console.log('Users with completed orders:', usersWithOrders);
+
+  const usersAndTheirOrders = await db.table('users')
+    .select(['users.name', 'orders.amount', 'orders.status'])
+    .leftJoin('orders', 'users.id', 'orders.user_id') // LEFT JOIN
+    .orderBy('users.name', 'ASC')
+    .execute();
+
+  console.log('Users and all their orders (if any):', usersAndTheirOrders);
 }
 
-insertExample();
+joinExample();
 ```
 
-### Atualizando Dados
+### Group By e Having
 
 ```typescript
 import Database from 'pg-query-sdk';
@@ -143,33 +141,21 @@ const db = new Database({
   connectionString: 'postgres://user:pass@localhost:5432/your_database',
 });
 
-async function updateExample() {
-  const updatedData = { email: 'alice.smith@example.com', age: 31 };
-
-  const { query, params } = db.table('users')
-    .update(updatedData)
-    .where({ id: 1 })
-    .returning(['id', 'email', 'age'])
-    .build();
-
-  console.log('UPDATE Query:', query);
-  // Ex: UPDATE users SET email = $1, age = $2 WHERE id = $3 RETURNING id, email, age
-  console.log('UPDATE Params:', params);
-  // Ex: ['alice.smith@example.com', 31, 1]
-
-  const updatedUsers = await db.table('users')
-    .update(updatedData)
-    .where({ id: 1 })
-    .returning(['id', 'email', 'age'])
+async function groupByHavingExample() {
+  const categorySales = await db.table('products')
+    .select(['category', 'COUNT(id) as total_products', 'SUM(price) as total_value'])
+    .groupBy('category')
+    .having({ 'SUM(price)': { op: '>', value: 1000 } }) // HAVING SUM(price) > 1000
+    .orderBy('total_value', 'DESC')
     .execute();
 
-  console.log('Updated User:', updatedUsers[0]);
+  console.log('Category sales over 1000:', categorySales);
 }
 
-updateExample();
+groupByHavingExample();
 ```
 
-### Deletando Dados
+### Common Table Expressions (CTEs)
 
 ```typescript
 import Database from 'pg-query-sdk';
@@ -178,33 +164,57 @@ const db = new Database({
   connectionString: 'postgres://user:pass@localhost:5432/your_database',
 });
 
-async function deleteExample() {
-  const { query, params } = db.table('users')
-    .delete()
-    .where({ id: 1 })
-    .returning(['id', 'name'])
-    .build();
+async function cteExample() {
+  // Subquery para usuários ativos
+  const activeUsersSubquery = db.table('users')
+    .select(['id', 'name'])
+    .where({ active: true });
 
-  console.log('DELETE Query:', query);
-  // Ex: DELETE FROM users WHERE id = $1 RETURNING id, name
-  console.log('DELETE Params:', params);
-  // Ex: [1]
-
-  const deletedUsers = await db.table('users')
-    .delete()
-    .where({ id: 1 })
-    .returning(['id', 'name'])
+  // Query principal usando a CTE
+  const result = await db.table('active_users') // Referencia a CTE pelo nome
+    .with('active_users', activeUsersSubquery) // Define a CTE
+    .select(['name'])
+    .orderBy('name', 'ASC')
     .execute();
 
-  console.log('Deleted User:', deletedUsers[0]);
+  console.log('Users from CTE:', result);
 }
 
-deleteExample();
+cteExample();
 ```
 
-## 2️⃣ ConditionBuilder: Cláusulas WHERE Avançadas
+### Subqueries na Cláusula FROM
 
-O `ConditionBuilder` é usado dentro do método `where()` do `QueryBuilder` para construir condições complexas, incluindo operadores, `NULL` checks, expressões raw e agrupamentos `AND`/`OR`.
+```typescript
+import Database from 'pg-query-sdk';
+
+const db = new Database({
+  connectionString: 'postgres://user:pass@localhost:5432/your_database',
+});
+
+async function fromSubqueryExample() {
+  // Subquery para obter o total de pedidos por usuário
+  const userOrderCounts = db.table('orders')
+    .select(['user_id', 'COUNT(id) as order_count'])
+    .groupBy('user_id');
+
+  // Query principal usando a subquery como tabela
+  const usersWithOrderCounts = await db.table('users')
+    .select(['users.name', 'uoc.order_count'])
+    .fromSubquery(userOrderCounts, 'uoc') // Usa a subquery 'userOrderCounts' como 'uoc'
+    .join('users', 'users.id', 'uoc.user_id') // JOIN com a tabela original de usuários
+    .where({ 'uoc.order_count': { op: '>', value: 5 } })
+    .execute();
+
+  console.log('Users with more than 5 orders:', usersWithOrderCounts);
+}
+
+fromSubqueryExample();
+```
+
+## 2️⃣ ConditionBuilder: Cláusulas WHERE e HAVING Avançadas
+
+O `ConditionBuilder` é usado dentro dos métodos `where()` e `having()` do `QueryBuilder` para construir condições complexas, incluindo operadores, `NULL` checks, expressões raw e agrupamentos `AND`/`OR`.
 
 ```typescript
 import Database from 'pg-query-sdk';
@@ -218,13 +228,13 @@ async function complexWhereExample() {
     .select(['name', 'price', 'stock', 'category'])
     .where(conditions => {
       conditions
-        .where({ category: 'electronics' }) // category = 'electronics'
+        .where({ category: 'electronics' }) // category = $1
         .andGroup(group1 => { // AND (...)
           group1
-            .where({ stock: { op: '>', value: 0 } }) // stock > 0
+            .where({ stock: { op: '>', value: 0 } }) // stock > $2
             .orGroup(group2 => { // OR (...)
               group2
-                .where({ price: { op: '<', value: 100 } }) // price < 100
+                .where({ price: { op: '<', value: 100 } }) // price < $3
                 .raw('created_at > NOW() - INTERVAL \'1 year\''); // created_at > ...
             });
         })
@@ -243,7 +253,7 @@ complexWhereExample();
 
 ## 3️⃣ QueryExecutor: Execução Direta de Queries
 
-Embora o `QueryBuilder` seja preferível para a maioria dos casos, você pode usar o `QueryExecutor` diretamente para queries SQL customizadas ou procedimentos armazenados. A instância do `QueryExecutor` é gerenciada internamente pelo `Database`.
+O `QueryExecutor` é a camada responsável por interagir diretamente com o driver `pg` para executar queries. Embora o `QueryBuilder` seja preferível para a maioria dos casos, você pode acessar o `QueryExecutor` diretamente através da instância `Database` para queries SQL customizadas, procedimentos armazenados ou comandos DDL.
 
 ```typescript
 import Database from 'pg-query-sdk';
@@ -253,17 +263,23 @@ const db = new Database({
 });
 
 async function directExecuteExample() {
+  // Executando uma query simples
   const result = await db.executor.execute(
     'SELECT version(), NOW() as current_time',
     []
   );
   console.log('Direct Execution Result:', result.rows);
 
+  // Executando uma query com parâmetros
   const specificUser = await db.executor.execute(
     'SELECT * FROM users WHERE id = $1',
     [1]
   );
   console.log('Specific User (Direct):', specificUser.rows[0]);
+
+  // Exemplo de DDL (Data Definition Language) - CUIDADO ao usar em produção!
+  // await db.executor.execute('CREATE TABLE IF NOT EXISTS temp_table (id SERIAL PRIMARY KEY, name VARCHAR(255))', []);
+  // console.log('temp_table created (if not exists).');
 }
 
 directExecuteExample();
@@ -271,7 +287,7 @@ directExecuteExample();
 
 ## 4️⃣ Transações ACID
 
-O SDK oferece um gerenciador de transações robusto para garantir a atomicidade das suas operações de banco de dados.
+O SDK oferece um gerenciador de transações robusto para garantir a atomicidade (ACID) das suas operações de banco de dados. Se qualquer operação dentro da transação falhar, todas as alterações serão revertidas (rollback).
 
 ```typescript
 import Database from 'pg-query-sdk';
@@ -287,29 +303,37 @@ async function transactionExample() {
       // que está vinculada à transação atual.
       // Todas as operações feitas com 'trxDb' farão parte da mesma transação.
 
-      // 1. Inserir um novo pedido
-      const newOrder = await trxDb.table('orders')
-        .insert({ customer_id: 1, amount: 150.00, status: 'pending' })
-        .returning(['id'])
-        .execute();
-      const orderId = newOrder[0].id;
-      console.log('Order inserted with ID:', orderId);
+      // Exemplo: Transferir fundos entre contas
+      const senderId = 1;
+      const receiverId = 2;
+      const amount = 100.00;
 
-      // 2. Atualizar o saldo do cliente (exemplo hipotético)
-      // Se esta operação falhar, a inserção do pedido também será revertida.
-      await trxDb.table('customers')
-        .update({ balance: { op: '-', value: 150.00 } }) // Decrementa o saldo
-        .where({ id: 1 })
-        .execute();
-      console.log('Customer balance updated.');
+      // 1. Decrementar saldo do remetente
+      // Nota: Para INSERT/UPDATE/DELETE, você precisará usar db.executor.execute() diretamente
+      // ou implementar esses métodos em um repositório customizado.
+      await trxDb.executor.execute(
+        'UPDATE accounts SET balance = balance - $1 WHERE id = $2 AND balance >= $1 RETURNING id, balance',
+        [amount, senderId]
+      );
+      console.log(`Decremented balance for account ${senderId}`);
+
+      // Simular uma falha para testar o rollback
+      // if (true) throw new Error('Simulated failure');
+
+      // 2. Incrementar saldo do destinatário
+      await trxDb.executor.execute(
+        'UPDATE accounts SET balance = balance + $1 WHERE id = $2 RETURNING id, balance',
+        [amount, receiverId]
+      );
+      console.log(`Incremented balance for account ${receiverId}`);
 
       // Se tudo ocorrer bem, a transação será commitada automaticamente.
-      return `Transaction successful for order ${orderId}`;
+      return `Transaction successful: ${amount} transferred from ${senderId} to ${receiverId}`;
     });
 
     console.log(result);
   } catch (error) {
-    console.error('Transaction failed:', error);
+    console.error('Transaction failed:', error.message);
     // Se uma exceção for lançada, a transação será automaticamente revertida (rollback).
   }
 }
@@ -321,7 +345,9 @@ transactionExample();
 
 O SDK fornece uma base para construir um ORM simples usando a classe `Repository`. Isso ajuda a organizar o código de acesso a dados por entidade.
 
-### Definindo um Repositório
+### Definindo um Repositório Customizado
+
+A classe base `Repository<T>` oferece um método `findById` e um `qb()` que retorna um `QueryBuilder` pré-configurado para a tabela. Para operações de `INSERT`, `UPDATE` e `DELETE`, você precisará implementá-las em seus repositórios customizados, utilizando o `QueryExecutor` ou o `QueryBuilder` (para `SELECT` após a operação).
 
 ```typescript
 import { Repository, QueryExecutor, Dialect } from 'pg-query-sdk';
@@ -342,6 +368,9 @@ class UserRepository extends Repository<User> {
     super('users', executor, dialect);
   }
 
+  // Método implementado na classe base
+  // async findById(id: number): Promise<User | null> { ... }
+
   // Exemplo de método customizado para o repositório de usuários
   async findActiveUsers(): Promise<User[]> {
     return this.qb() // 'this.qb()' retorna um QueryBuilder pré-configurado para a tabela 'users'
@@ -359,22 +388,35 @@ class UserRepository extends Repository<User> {
       .execute();
   }
 
+  // Exemplo de implementação de INSERT em um repositório customizado
   async createUser(data: Omit<User, 'id'>): Promise<User> {
-    const result = await this.qb()
-      .insert(data)
-      .returning(['id', 'name', 'email', 'age', 'active'])
-      .execute();
-    return result[0];
+    const { query, params } = this.dialect.createInsertQuery(this.table, data as Record<string, any>, ['id', 'name', 'email', 'age', 'active']);
+    const result = await this.executor.execute(query, params);
+    return result.rows[0];
+  }
+
+  // Exemplo de implementação de UPDATE em um repositório customizado
+  async updateUser(id: number, data: Partial<User>): Promise<User | null> {
+    const { query, params } = this.dialect.createUpdateQuery(this.table, data as Record<string, any>, { id }, ['id', 'name', 'email', 'age', 'active']);
+    const result = await this.executor.execute(query, params);
+    return result.rows[0] || null;
+  }
+
+  // Exemplo de implementação de DELETE em um repositório customizado
+  async deleteUser(id: number): Promise<boolean> {
+    const { query, params } = this.dialect.createDeleteQuery(this.table, { id });
+    const result = await this.executor.execute(query, params);
+    return result.rowCount > 0;
   }
 }
 ```
 
-### Usando o Repositório
+### Usando o Repositório Customizado
 
 ```typescript
 import Database from 'pg-query-sdk';
 // Importe seu UserRepository definido acima
-import { UserRepository } from './path/to/UserRepository'; // Ajuste o caminho
+import { UserRepository } from './path/to/UserRepository'; // Ajuste o caminho conforme necessário
 
 const db = new Database({
   connectionString: 'postgres://user:pass@localhost:5432/your_database',
@@ -384,23 +426,33 @@ async function repositoryExample() {
   // Obtenha uma instância do seu repositório através do método .repository() do Database
   const userRepository = db.repository(UserRepository);
 
-  // Usando métodos do repositório
+  // Usando métodos do repositório base
   const userById = await userRepository.findById(1);
   console.log('User by ID:', userById);
 
+  // Usando métodos customizados
   const activeUsers = await userRepository.findActiveUsers();
   console.log('Active Users:', activeUsers);
 
   const usersInAgeRange = await userRepository.findUsersByAgeRange(25, 35);
   console.log('Users in age range 25-35:', usersInAgeRange);
 
+  // Criando um novo usuário
   const newUser = await userRepository.createUser({
-    name: 'Bob',
-    email: 'bob@example.com',
-    age: 28,
+    name: 'Charlie',
+    email: 'charlie@example.com',
+    age: 29,
     active: true
   });
   console.log('Created new user:', newUser);
+
+  // Atualizando um usuário
+  const updatedUser = await userRepository.updateUser(newUser.id, { age: 30, active: false });
+  console.log('Updated user:', updatedUser);
+
+  // Deletando um usuário
+  const deleted = await userRepository.deleteUser(newUser.id);
+  console.log(`User ${newUser.id} deleted: ${deleted}`);
 }
 
 repositoryExample();
@@ -458,8 +510,8 @@ pg-query-sdk/
       QueryExecutor.ts      # Executa queries no PostgreSQL
       TransactionManager.ts # Gerencia transações
     builders/
-      ConditionBuilder.ts   # Constrói cláusulas WHERE
-      QueryBuilder.ts       # Constrói queries SQL (SELECT, INSERT, UPDATE, DELETE)
+      ConditionBuilder.ts   # Constrói cláusulas WHERE e HAVING
+      QueryBuilder.ts       # Constrói queries SQL (apenas SELECT)
     orm/
       EntityManager.ts      # (Planejado) Gerenciador de entidades
       Repository.ts         # Classe base para repositórios ORM
@@ -475,24 +527,24 @@ pg-query-sdk/
 
 # 📌 Responsabilidades das Camadas
 
-| Camada             | Responsabilidade                                         |
-|--------------------|----------------------------------------------------------|
-| `Database`         | Ponto de entrada, gerencia conexão, dialeto, transações e acesso a builders/repositórios. |
-| `QueryBuilder`     | Construção fluente de queries SQL (SELECT, INSERT, UPDATE, DELETE). |
-| `ConditionBuilder` | Construção de cláusulas `WHERE` complexas e aninhadas.   |
-| `QueryExecutor`    | Execução de queries no PostgreSQL e gerenciamento do pool de conexões. |
-| `Repository`       | Abstração de acesso a dados para uma entidade específica (CRUD básico e métodos customizados). |
-| `TransactionManager`| Gerenciamento de transações ACID.                        |
-| `EntityManager`    | (Planejado) Gerenciamento de múltiplos repositórios e unidade de trabalho. |
-| `pg` (driver)      | Comunicação de baixo nível com o banco de dados PostgreSQL. |
+| Camada             | Responsabilidade                                                                                             |
+|--------------------|--------------------------------------------------------------------------------------------------------------|
+| `Database`         | Ponto de entrada, gerencia conexão, dialeto, transações e acesso a builders/repositórios.                    |
+| `QueryBuilder`     | Construção fluente de queries SQL **apenas para seleção de dados** (SELECT, JOIN, WHERE, GROUP BY, HAVING, ORDER BY, LIMIT, OFFSET, CTEs, Subqueries). |
+| `ConditionBuilder` | Construção de cláusulas `WHERE` e `HAVING` complexas e aninhadas.                                            |
+| `QueryExecutor`    | Execução de queries no PostgreSQL e gerenciamento do pool de conexões.                                       |
+| `Repository`       | Abstração de acesso a dados para uma entidade específica. A classe base implementa `findById`. Métodos como `insert`, `update`, `delete` devem ser implementados nos repositórios customizados. |
+| `TransactionManager`| Gerenciamento de transações ACID.                                                                            |
+| `EntityManager`    | (Planejado) Gerenciamento de múltiplos repositórios e unidade de trabalho.                                   |
+| `pg` (driver)      | Comunicação de baixo nível com o banco de dados PostgreSQL.                                                  |
 
 ---
 
 # 🔐 Segurança
 
-- **Parâmetros Preparados**: Todas as queries construídas pelo `QueryBuilder` e `ConditionBuilder` utilizam parâmetros preparados, prevenindo ataques de SQL Injection.
-- **Pool de Conexões**: O `QueryExecutor` gerencia um pool de conexões, otimizando o uso de recursos e garantindo que as conexões sejam reutilizadas de forma eficiente.
-- **Liberação de Conexões**: As conexões são sempre liberadas de volta ao pool no bloco `finally` após a execução da query ou transação, evitando vazamentos de conexão.
+-   **Parâmetros Preparados**: Todas as queries construídas pelo `QueryBuilder` e `ConditionBuilder` utilizam parâmetros preparados, prevenindo ataques de SQL Injection. O `QueryExecutor` também suporta parâmetros para queries diretas.
+-   **Pool de Conexões**: O `QueryExecutor` gerencia um pool de conexões, otimizando o uso de recursos e garantindo que as conexões sejam reutilizadas de forma eficiente.
+-   **Liberação de Conexões**: As conexões são sempre liberadas de volta ao pool no bloco `finally` após a execução da query ou transação, evitando vazamentos de conexão.
 
 ---
 
