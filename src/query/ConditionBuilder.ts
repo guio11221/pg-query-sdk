@@ -36,7 +36,25 @@ export default class ConditionBuilder {
 
     constructor(private ctx: ParamContext) {}
 
-    where(obj: Record<string, ConditionValue>) {
+    where(
+        obj: Record<string, any> | ((qb: ConditionBuilder) => void)
+    ) {
+
+        if (typeof obj === 'function') {
+
+            const nested = new ConditionBuilder(this.ctx)
+
+            obj(nested)
+
+            const built = nested.build()
+
+            if (built) {
+                this.add(`(${built.replace(/^WHERE\s/, '')})`)
+            }
+
+            return this
+        }
+
         Object.entries(obj).forEach(([key, condition]) => {
 
             if (condition === null) {
@@ -44,9 +62,11 @@ export default class ConditionBuilder {
                 return
             }
 
-            if (typeof condition === 'object'
+            if (
+                typeof condition === 'object'
                 && condition !== null
-                && 'op' in condition) {
+                && 'op' in condition
+            ) {
 
                 const { op, value } = condition as any
 

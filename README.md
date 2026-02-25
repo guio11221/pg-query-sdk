@@ -76,30 +76,46 @@ selectExample();
 The `ConditionBuilder` facilitates the creation of complex conditional logic within `WHERE` and `HAVING` clauses, typically used in conjunction with the `QueryBuilder`.
 
 ```typescript
-import {Database} from 'pg-query-sdk';
+import { Database } from 'pg-query-sdk';
 
 const db = new Database({
-  connectionString: 'postgres://user:pass@localhost:5432/your_database',
+    connectionString: 'postgres://user:pass@localhost:5432/your_database',
 });
 
 async function complexWhereExample() {
-  const products = await db.table('products')
-    .select(['name', 'price'])
-    .where(conditions => {
-      conditions
-        .where({ category: 'electronics' })
-        .orGroup(group => {
-          group
-            .where({ price: { op: '<', value: 100 } })
-            .where({ stock: { op: '>', value: 0 } });
-        });
-    })
-    .execute();
 
-  console.log('Complex WHERE Products:', products);
+    const products = await db
+        .table('products')
+        .select(['name', 'price'])
+        .where(conditions => {
+
+            conditions
+                .where({ category: 'electronics' })
+                .orGroup(group => {
+
+                    group
+                        .where({
+                            price: {
+                                op: '<',
+                                value: 100
+                            }
+                        })
+                        .where({
+                            stock: {
+                                op: '>',
+                                value: 0
+                            }
+                        })
+
+                })
+
+        })
+        .execute()
+
+    console.log('Complex WHERE Products:', products)
 }
 
-complexWhereExample();
+complexWhereExample()
 ```
 
 ### 3️⃣ QueryExecutor: Direct Query Execution

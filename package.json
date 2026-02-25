@@ -1,6 +1,6 @@
 {
   "name": "pg-query-sdk",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "PostgreSQL SDK with Query Builder and Executor",
   "main": "dist/cjs/index.js",
   "types": "dist/esm/index.d.ts",
