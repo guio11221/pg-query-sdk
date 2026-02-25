@@ -1,7 +1,6 @@
-
 {
   "name": "pg-query-sdk",
-  "version": "2.0.0",
+  "version": "1.0.1",
   "description": "PostgreSQL SDK with Query Builder and Executor",
   "main": "dist/cjs/index.js",
   "types": "dist/esm/index.d.ts",
@@ -15,8 +14,26 @@
   "scripts": {
     "build:cjs": "tsc -p tsconfig.cjs.json",
     "build:esm": "tsc -p tsconfig.esm.json",
-    "build": "npm run build:cjs && npm run build:esm"
+    "build": "npm run build:cjs && npm run build:esm",
+    "prepublishOnly": "npm run build"
   },
+  "files": [
+    "dist"
+  ],
+  "author": {
+    "name": "Guilherme",
+    "email": "sguii5147@gmail.com",
+    "url": "https://github.com/guio11221"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/guio11221/pg-query-sdk.git"
+  },
+  "bugs": {
+    "url": "https://github.com/guio11221/pg-query-sdk/issues"
+  },
+  "homepage": "https://github.com/guio11221/pg-query-sdk#readme",
+  "license": "MIT",
   "dependencies": {
     "pg": "^8.18.0"
   },

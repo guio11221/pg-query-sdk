@@ -11,12 +11,25 @@ type Operator =
     | 'LIKE'
     | 'ILIKE'
 
+/**
+ * A builder for constructing SQL WHERE and HAVING clauses.
+ */
 export default class ConditionBuilder {
     private parts: string[] = []
 
+    /**
+     * Creates an instance of ConditionBuilder.
+     * @param ctx - The ParamContext to manage query parameters.
+     */
     constructor(private ctx: ParamContext) {
     }
 
+    /**
+     * Adds one or more WHERE conditions based on an object.
+     * Supports direct equality, `null` checks, and custom operators.
+     * @param obj - An object where keys are column names and values are the desired values or an object with `op` and `value`.
+     * @returns The current ConditionBuilder instance.
+     */
     where(obj: Record<string, any>) {
         Object.entries(obj).forEach(([key, value]) => {
             if (value === null) {
@@ -42,11 +55,21 @@ export default class ConditionBuilder {
         return this
     }
 
+    /**
+     * Adds a raw SQL expression to the conditions.
+     * @param expression - The raw SQL expression.
+     * @returns The current ConditionBuilder instance.
+     */
     raw(expression: string) {
         this.parts.push(expression)
         return this
     }
 
+    /**
+     * Adds a group of conditions connected by AND.
+     * @param cb - A callback function that receives a nested ConditionBuilder to define conditions within the group.
+     * @returns The current ConditionBuilder instance.
+     */
     andGroup(cb: (qb: ConditionBuilder) => void) {
         const nested = new ConditionBuilder(this.ctx)
         cb(nested)
@@ -59,6 +82,11 @@ export default class ConditionBuilder {
         return this
     }
 
+    /**
+     * Adds a group of conditions connected by OR.
+     * @param cb - A callback function that receives a nested ConditionBuilder to define conditions within the group.
+     * @returns The current ConditionBuilder instance.
+     */
     orGroup(cb: (qb: ConditionBuilder) => void) {
         const nested = new ConditionBuilder(this.ctx)
         cb(nested)
@@ -72,6 +100,11 @@ export default class ConditionBuilder {
         return this
     }
 
+    /**
+     * Builds the SQL condition string.
+     * @param prefix - The prefix for the condition (e.g., 'WHERE', 'HAVING'). Defaults to 'WHERE'.
+     * @returns The built SQL condition string, or an empty string if no conditions were added.
+     */
     build(prefix = 'WHERE'): string {
         if (!this.parts.length) return ''
 
