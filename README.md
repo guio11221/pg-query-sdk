@@ -136,8 +136,6 @@ const db = new Database({
 async function transactionExample() {
   try {
     const result = await db.transaction(async trxDb => {
-      // 'trxDb' is a Database instance bound to the current transaction.
-      // Use 'trxDb.executor.execute()' for DML operations within the transaction.
       await trxDb.executor.execute(
         'UPDATE accounts SET balance = balance - $1 WHERE id = $2',
         [100.00, 1]
@@ -181,9 +179,6 @@ class UserRepository extends Repository<User> {
       .where({ name })
       .execute();
   }
-
-  // Implement DML operations as needed.
-  // Example: async insert(data: Partial<User>): Promise<User> { /* ... */ }
 }
 
 const db = new Database({
@@ -212,7 +207,7 @@ The package provides support for both CommonJS and ES Modules environments.
 ### CommonJS
 
 ```javascript
-const Database = require('pg-query-sdk').default;
+const {Database} = require('pg-query-sdk');
 const db = new Database({ /* ... */ });
 ```
 
