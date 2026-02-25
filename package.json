@@ -20,6 +20,24 @@
   "files": [
     "dist"
   ],
+  "keywords": [
+    "postgres",
+    "typescript",
+    "sdk",
+    "pg",
+    "database",
+    "query-builder",
+    "sql",
+    "orm",
+    "database-sdk",
+    "nodejs",
+    "query-engine",
+    "sql-builder",
+    "repository",
+    "transaction",
+    "cte",
+    "prepared-statement"
+  ],
   "author": {
     "name": "Guilherme",
     "email": "sguii5147@gmail.com",
