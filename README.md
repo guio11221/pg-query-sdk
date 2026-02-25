@@ -35,7 +35,7 @@ npm install pg-query-sdk
 The `Database` class serves as the primary interface for all database interactions. Instantiate it with your PostgreSQL connection string.
 
 ```typescript
-import Database from 'pg-query-sdk';
+import {Database} from 'pg-query-sdk';
 
 const db = new Database({
   connectionString: 'postgres://user:pass@localhost:5432/your_database',
@@ -51,7 +51,7 @@ const db = new Database({
 The `QueryBuilder` enables the programmatic construction of SQL `SELECT` statements, accessible via the `db.table()` method.
 
 ```typescript
-import Database from 'pg-query-sdk';
+import {Database} from 'pg-query-sdk';
 
 const db = new Database({
   connectionString: 'postgres://user:pass@localhost:5432/your_database',
@@ -76,7 +76,7 @@ selectExample();
 The `ConditionBuilder` facilitates the creation of complex conditional logic within `WHERE` and `HAVING` clauses, typically used in conjunction with the `QueryBuilder`.
 
 ```typescript
-import Database from 'pg-query-sdk';
+import {Database} from 'pg-query-sdk';
 
 const db = new Database({
   connectionString: 'postgres://user:pass@localhost:5432/your_database',
@@ -129,7 +129,7 @@ directExecuteExample();
 The SDK provides robust support for managing ACID-compliant transactions, ensuring data integrity.
 
 ```typescript
-import Database from 'pg-query-sdk';
+import {Database} from 'pg-query-sdk';
 
 const db = new Database({
   connectionString: 'postgres://user:pass@localhost:5432/your_database',
@@ -164,7 +164,7 @@ transactionExample();
 The abstract `Repository<T>` class offers a foundational ORM layer, providing methods like `findById` and a pre-configured `QueryBuilder` (`qb()`). Custom DML operations (`insert`, `update`, `delete`) should be implemented in concrete repository classes.
 
 ```typescript
-import Database, { Repository } from 'pg-query-sdk';
+import {Database, Repository } from 'pg-query-sdk';
 import { QueryExecutor, Dialect } from 'pg-query-sdk';
 
 interface User {
@@ -221,7 +221,7 @@ const db = new Database({ /* ... */ });
 ### ESM
 
 ```typescript
-import Database from 'pg-query-sdk';
+import {Database} from 'pg-query-sdk';
 const db = new Database({ /* ... */ });
 ```
 
