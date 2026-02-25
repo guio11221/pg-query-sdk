@@ -220,32 +220,6 @@ const db = new Database({ /* ... */ });
 
 ---
 
-## 🧱 Project Structure
-
-The project is organized into distinct modules, each responsible for a specific aspect of database interaction:
-
-```
-pg-query-sdk/
-  src/
-    core/
-      Database.ts           # Central database interface
-      ParamContext.ts       # Manages query parameters
-      QueryExecutor.ts      # Executes SQL queries
-      TransactionManager.ts # Handles database transactions
-    builders/
-      ConditionBuilder.ts   # Builds WHERE/HAVING clauses
-      QueryBuilder.ts       # Builds SELECT queries
-    orm/
-      EntityManager.ts      # (Planned) Entity management
-      Repository.ts         # Abstract base for data access
-    dialects/
-      Dialect.ts            # Interface for database dialects
-      PostgresDialect.ts    # PostgreSQL specific dialect implementation
-    index.ts                # Main entry point for module exports
-```
-
----
-
 ## 📌 Responsibilities of Layers
 
 | Layer                 | Responsibility                                                                                                 |
