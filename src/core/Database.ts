@@ -1,4 +1,4 @@
-import { Dialect } from '../dialects/Dialect'
+import {Dialect} from '../dialects/Dialect'
 import PostgresDialect from '../dialects/PostgresDialect'
 import QueryExecutor from './QueryExecutor'
 import QueryBuilder from '../query/QueryBuilder'
@@ -25,10 +25,6 @@ export default class Database {
         this.defaultCacheTTL = options.defaultCacheTTL
     }
 
-    /* ========================
-       QueryBuilder Direct
-    ========================= */
-
     table<T = any>(name: string) {
         return new QueryBuilder<T>(
             name,
@@ -37,10 +33,6 @@ export default class Database {
             this.defaultCacheTTL
         )
     }
-
-    /* ========================
-       Transaction Scope
-    ========================= */
 
     async transaction<T>(
         callback: (trxDb: Database) => Promise<T>
@@ -66,9 +58,6 @@ export default class Database {
     setExecutor(executor: QueryExecutor) {
         this.executor = executor
     }
-    /* ========================
-       Repository Factory
-    ========================= */
 
     repository<R>(
         RepoClass: new (

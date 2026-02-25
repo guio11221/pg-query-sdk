@@ -6,7 +6,8 @@ export default abstract class Repository<T> {
         protected table: string,
         protected executor: QueryExecutor,
         protected dialect: Dialect
-    ) {}
+    ) {
+    }
 
     qb() {
         return new QueryBuilder<T>(
@@ -18,7 +19,7 @@ export default abstract class Repository<T> {
 
     async findById(id: number): Promise<T | null> {
         const rows = await this.qb()
-            .where({ id })
+            .where({id})
             .limit(1)
             .execute()
 

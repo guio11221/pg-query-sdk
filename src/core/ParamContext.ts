@@ -3,7 +3,8 @@ import {Dialect} from "../dialects/Dialect";
 export default class ParamContext {
     private params: any[] = []
 
-    constructor(private dialect: Dialect) {}
+    constructor(private dialect: Dialect) {
+    }
 
     add(value: any) {
         this.params.push(value)

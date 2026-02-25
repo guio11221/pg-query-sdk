@@ -1,7 +1,8 @@
-import { Pool, PoolClient } from 'pg'
+import {Pool, PoolClient} from 'pg'
 
 export default class TransactionManager {
-    constructor(private pool: Pool) {}
+    constructor(private pool: Pool) {
+    }
 
     async transaction<T>(
         callback: (trxClient: PoolClient) => Promise<T>

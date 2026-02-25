@@ -3,7 +3,8 @@ import ParamContext from "../core/ParamContext";
 export default class ConditionBuilder {
     private conditions: string[] = []
 
-    constructor(private ctx: ParamContext) {}
+    constructor(private ctx: ParamContext) {
+    }
 
     where(obj: Record<string, any>) {
         Object.entries(obj).forEach(([key, value]) => {

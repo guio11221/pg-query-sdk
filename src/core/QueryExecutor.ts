@@ -1,4 +1,4 @@
-import { Pool, PoolClient, QueryResult } from 'pg'
+import {Pool, PoolClient, QueryResult} from 'pg'
 
 interface ExecutorOptions {
     connectionString: string
@@ -28,7 +28,7 @@ export default class QueryExecutor {
     }
 
     async execute(
-        query: string, params: any[] = [], cacheTTL: number | undefined    ): Promise<QueryResult> {
+        query: string, params: any[] = [], cacheTTL: number | undefined): Promise<QueryResult> {
         if (this.client) {
             return this.client.query(query, params)
         }

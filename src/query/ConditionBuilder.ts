@@ -14,9 +14,8 @@ type Operator =
 export default class ConditionBuilder {
     private parts: string[] = []
 
-    constructor(private ctx: ParamContext) {}
-
-    /* ================= BASIC WHERE ================= */
+    constructor(private ctx: ParamContext) {
+    }
 
     where(obj: Record<string, any>) {
         Object.entries(obj).forEach(([key, value]) => {
@@ -26,7 +25,7 @@ export default class ConditionBuilder {
             }
 
             if (typeof value === 'object' && value !== null && 'op' in value) {
-                const { op, value: v } = value as {
+                const {op, value: v} = value as {
                     op: Operator
                     value: any
                 }
@@ -43,14 +42,10 @@ export default class ConditionBuilder {
         return this
     }
 
-    /* ================= RAW ================= */
-
     raw(expression: string) {
         this.parts.push(expression)
         return this
     }
-
-    /* ================= GROUPING ================= */
 
     andGroup(cb: (qb: ConditionBuilder) => void) {
         const nested = new ConditionBuilder(this.ctx)
@@ -76,8 +71,6 @@ export default class ConditionBuilder {
 
         return this
     }
-
-    /* ================= BUILD ================= */
 
     build(prefix = 'WHERE'): string {
         if (!this.parts.length) return ''

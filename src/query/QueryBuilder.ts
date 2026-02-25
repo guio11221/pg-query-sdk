@@ -1,7 +1,7 @@
 import ParamContext from '../core/ParamContext'
 import ConditionBuilder from './ConditionBuilder'
 import QueryExecutor from '../core/QueryExecutor'
-import { Dialect } from '../dialects/Dialect'
+import {Dialect} from '../dialects/Dialect'
 
 type JoinType = 'INNER' | 'LEFT' | 'RIGHT'
 
@@ -35,24 +35,13 @@ export default class QueryBuilder<T = any> {
         this.havingCondition = new ConditionBuilder(this.ctx)
     }
 
-    /* ================= SELECT ================= */
-
     select(fields: (keyof T | string)[]) {
         this.fields = fields.map(String)
         return this
     }
 
-    /* ================= JOINS ================= */
-
-    private addJoin(
-        type: JoinType,
-        table: string,
-        localKey: string,
-        foreignKey: string
-    ) {
-        this.joins.push(
-            `${type} JOIN ${table} ON ${localKey} = ${foreignKey}`
-        )
+    private addJoin(type: JoinType, table: string, localKey: string, foreignKey: string) {
+        this.joins.push(`${type} JOIN ${table} ON ${localKey} = ${foreignKey}`)
         return this
     }
 
@@ -67,8 +56,6 @@ export default class QueryBuilder<T = any> {
     rightJoin(table: string, localKey: string, foreignKey: string) {
         return this.addJoin('RIGHT', table, localKey, foreignKey)
     }
-
-    /* ================= WHERE ================= */
 
     where(obj: Partial<T>) {
         this.condition.where(obj as any)
@@ -90,8 +77,6 @@ export default class QueryBuilder<T = any> {
         return this
     }
 
-    /* ================= GROUP ================= */
-
     groupBy(fields: string | string[]) {
         if (Array.isArray(fields)) {
             this.groupByFields.push(...fields)
@@ -111,14 +96,10 @@ export default class QueryBuilder<T = any> {
         return this
     }
 
-    /* ================= ORDER ================= */
-
     orderBy(column: string, direction: 'ASC' | 'DESC' = 'ASC') {
         this.orderByFields.push(`${column} ${direction}`)
         return this
     }
-
-    /* ================= LIMIT / OFFSET ================= */
 
     limit(value: number) {
         this.limitCount = value
@@ -130,27 +111,17 @@ export default class QueryBuilder<T = any> {
         return this
     }
 
-    /* ================= CTE ================= */
-
-    with(
-        name: string,
-        subQuery: QueryBuilder<any>,
-        recursive = false
-    ) {
-        this.ctes.push({ name, query: subQuery, recursive })
+    with(name: string, subQuery: QueryBuilder<any>, recursive = false) {
+        this.ctes.push({name, query: subQuery, recursive})
         return this
     }
 
-    /* ================= SUBQUERY ================= */
-
     fromSubquery(sub: QueryBuilder<any>, alias: string) {
-        const { query, params } = sub.build()
+        const {query, params} = sub.build()
         params.forEach(p => this.ctx.add(p))
         this.fromClause = `(${query}) AS ${alias}`
         return this
     }
-
-    /* ================= CLONE ================= */
 
     clone(): QueryBuilder<T> {
         const qb = new QueryBuilder<T>(
@@ -171,8 +142,6 @@ export default class QueryBuilder<T = any> {
         return qb
     }
 
-    /* ================= BUILD ================= */
-
     build() {
         let query = ''
 
@@ -181,7 +150,7 @@ export default class QueryBuilder<T = any> {
             query += `WITH ${recursive ? 'RECURSIVE ' : ''}`
 
             const parts = this.ctes.map(cte => {
-                const { query: q, params } = cte.query.build()
+                const {query: q, params} = cte.query.build()
                 params.forEach(p => this.ctx.add(p))
                 return `${cte.name} AS (${q})`
             })
@@ -189,9 +158,7 @@ export default class QueryBuilder<T = any> {
             query += parts.join(', ') + ' '
         }
 
-        const select = this.fields.length
-            ? this.fields.join(', ')
-            : '*'
+        const select = this.fields.length ? this.fields.join(', ') : '*'
 
         query += `SELECT ${select} FROM ${this.fromClause}`
 
@@ -227,10 +194,8 @@ export default class QueryBuilder<T = any> {
         }
     }
 
-    /* ================= EXECUTE ================= */
-
     async execute(): Promise<T[]> {
-        const { query, params } = this.build()
+        const {query, params} = this.build()
         const result = await this.executor.execute(
             query,
             params,
