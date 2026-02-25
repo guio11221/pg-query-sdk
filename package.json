@@ -1,9 +1,14 @@
 {
   "name": "pg-query-sdk",
-  "version": "1.0.5",
-  "description": "PostgreSQL SDK with Query Builder and Executor",
+  "version": "1.2.0",
+  "description": "PostgreSQL SDK with Query Builder, Query Executor and Transaction Manager",
+  "type": "commonjs",
   "main": "dist/cjs/index.js",
   "types": "dist/esm/index.d.ts",
+  "sideEffects": false,
+  "engines": {
+    "node": ">=18"
+  },
   "exports": {
     ".": {
       "require": "./dist/cjs/index.js",
@@ -15,27 +20,27 @@
     "build:cjs": "tsc -p tsconfig.cjs.json",
     "build:esm": "tsc -p tsconfig.esm.json",
     "build": "npm run build:cjs && npm run build:esm",
+    "lint": "echo \"Add lint later\"",
+    "test": "echo \"Add tests\"",
     "prepublishOnly": "npm run build"
   },
   "files": [
     "dist"
   ],
   "keywords": [
+    "postgresql",
     "postgres",
     "typescript",
-    "sdk",
-    "pg",
-    "database",
-    "query-builder",
-    "sql",
-    "orm",
-    "database-sdk",
     "nodejs",
-    "query-engine",
-    "sql-builder",
-    "repository",
+    "database",
+    "sql",
+    "query-builder",
+    "sdk",
+    "orm",
     "transaction",
     "cte",
+    "repository-pattern",
+    "query-engine",
     "prepared-statement"
   ],
   "author": {
@@ -45,19 +50,21 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/guio11221/pg-query-sdk.git"
+    "url": "git+https://github.com/guio11221/pg-query-sdk.git"
   },
   "bugs": {
     "url": "https://github.com/guio11221/pg-query-sdk/issues"
   },
   "homepage": "https://github.com/guio11221/pg-query-sdk#readme",
   "license": "MIT",
-  "dependencies": {
-    "pg": "^8.18.0"
+  "dependencies": {},
+  "peerDependencies": {
+    "pg": "^8.0.0"
   },
   "devDependencies": {
     "typescript": "^5.3.3",
     "@types/node": "^20.10.5",
-    "@types/pg": "^8.16.0"
+    "@types/pg": "^8.16.0",
+    "pg": "^8.18.0"
   }
 }
