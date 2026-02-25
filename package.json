@@ -1,6 +1,6 @@
 {
   "name": "pg-query-sdk",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "description": "PostgreSQL SDK with Query Builder, Query Executor and Transaction Manager",
   "type": "commonjs",
   "main": "dist/cjs/index.js",
