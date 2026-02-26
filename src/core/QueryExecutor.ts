@@ -1,7 +1,7 @@
-import {Pool, PoolClient, QueryResult} from 'pg'
+import { Pool, PoolClient, PoolConfig, QueryResult } from 'pg'
 
-interface ExecutorOptions {
-    connectionString: string
+interface ExecutorOptions extends PoolConfig {
+
 }
 
 /**
@@ -25,21 +25,20 @@ export default class QueryExecutor {
             return
         }
 
-        if (options?.connectionString) {
+        if (options) {
             this.pool = new Pool({
-                connectionString: options.connectionString
+                ...options
             })
             return
         }
 
-        throw new Error('Invalid QueryExecutor initialization')
+        throw new Error('QueryExecutor requires either PoolConfig or PoolClient')
     }
 
     /**
      * Executes a SQL query.
      * @param query - The SQL query string.
      * @param params - An array of parameters for the query.
-     * @param cacheTTL - Time-to-live for caching (not currently used in this implementation).
      * @returns A Promise that resolves to the QueryResult.
      */
     async execute(

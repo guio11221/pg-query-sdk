@@ -1,17 +1,37 @@
-import {Dialect} from '../dialects/Dialect'
+import { Dialect } from '../dialects/Dialect'
 import PostgresDialect from '../dialects/PostgresDialect'
 import QueryExecutor from './QueryExecutor'
 import QueryBuilder from '../query/QueryBuilder'
 import TransactionManager from './TransactionManager'
+import { PoolConfig } from 'pg'
 
-interface DatabaseOptions {
-    connectionString: string
+/**
+ * Configuration object for Database initialization.
+ *
+ * Extends the native PostgreSQL {@link PoolConfig}.
+ *
+ * @property dialect - SQL dialect strategy implementation.
+ * @property defaultCacheTTL - Default cache time-to-live in seconds for queries (optional).
+ */
+interface DatabaseOptions extends PoolConfig {
     dialect?: Dialect
     defaultCacheTTL?: number
 }
 
 /**
- * Represents a database connection and provides methods for querying and managing transactions.
+ * High-level database facade responsible for:
+ *
+ * - Managing the query executor lifecycle
+ * - Providing a QueryBuilder entrypoint
+ * - Handling transactions
+ * - Creating repository instances
+ *
+ * This class acts as the primary integration boundary between
+ * the infrastructure layer and the application layer.
+ *
+ * @remarks
+ * By default, it uses PostgresDialect when no dialect is provided.
+ * The underlying connection pool is managed by QueryExecutor.
  */
 export default class Database {
     private executor: QueryExecutor
@@ -20,24 +40,37 @@ export default class Database {
     private defaultCacheTTL?: number
 
     /**
-     * Creates an instance of the Database.
-     * @param options - The options for the database connection.
+     * Creates a new Database instance.
+     *
+     * @param options - Database configuration options.
+     * Must include valid PostgreSQL PoolConfig properties.
+     *
+     * @throws Error if QueryExecutor fails initialization.
      */
     constructor(options: DatabaseOptions) {
         this.dialect = options.dialect ?? new PostgresDialect()
+
         this.executor = new QueryExecutor(options)
+
         this.transactionManager = new TransactionManager(
             this.executor.getPool()!
         )
+
         this.defaultCacheTTL = options.defaultCacheTTL
     }
 
     /**
-     * Creates a QueryBuilder for a specific table.
-     * @param name - The name of the table.
-     * @returns A QueryBuilder instance.
+     * Creates a new QueryBuilder bound to a specific table.
+     *
+     * @template T - Expected row return type.
+     *
+     * @param name - Database table name.
+     * @returns A strongly-typed QueryBuilder instance.
+     *
+     * @example
+     * db.table<User>('users').where('id', 1).first()
      */
-    table<T = any>(name: string) {
+    table<T = any>(name: string): QueryBuilder<T> {
         return new QueryBuilder<T>(
             name,
             this.executor,
@@ -47,9 +80,25 @@ export default class Database {
     }
 
     /**
-     * Executes a transaction.
-     * @param callback - The function to execute within the transaction. It receives a transactional Database instance.
-     * @returns The result of the callback function.
+     * Executes a transactional operation.
+     *
+     * A new transactional Database instance is created internally
+     * using a dedicated PoolClient. All operations inside the callback
+     * are executed within the same transaction scope.
+     *
+     * @template T - Return type of the transactional callback.
+     *
+     * @param callback - Async function receiving a transactional Database instance.
+     * @returns The resolved value returned by the callback.
+     *
+     * @remarks
+     * - Automatically commits on success.
+     * - Automatically rolls back on error.
+     *
+     * @example
+     * await db.transaction(async trx => {
+     *   await trx.table('users').insert({...})
+     * })
      */
     async transaction<T>(
         callback: (trxDb: Database) => Promise<T>
@@ -73,17 +122,28 @@ export default class Database {
     }
 
     /**
-     * Sets the query executor.
-     * @param executor - The QueryExecutor instance to set.
+     * Overrides the current QueryExecutor instance.
+     *
+     * Primarily used internally for transaction-scoped Database instances.
+     *
+     * @param executor - QueryExecutor to be injected.
      */
-    setExecutor(executor: QueryExecutor) {
+    setExecutor(executor: QueryExecutor): void {
         this.executor = executor
     }
 
     /**
-     * Creates a repository instance.
-     * @param RepoClass - The constructor of the repository class.
-     * @returns An instance of the repository.
+     * Instantiates a repository bound to the current executor and dialect.
+     *
+     * @template R - Repository type.
+     *
+     * @param RepoClass - Repository constructor.
+     * Must accept (executor, dialect) as parameters.
+     *
+     * @returns A new repository instance.
+     *
+     * @example
+     * const userRepo = db.repository(UserRepository)
      */
     repository<R>(
         RepoClass: new (

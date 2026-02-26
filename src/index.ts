@@ -1,35 +1,75 @@
 /**
- * Re-exports the QueryExecutor class from the core module.
+ * @packageDocumentation
+ *
+ * Public API surface of the database SDK.
+ *
+ * This module re-exports the primary building blocks required to:
+ *
+ * - Execute queries
+ * - Build SQL statements fluently
+ * - Manage transactions
+ * - Implement repositories
+ * - Configure SQL dialects
+ *
+ * Consumers should import from this entrypoint instead of
+ * referencing internal paths directly.
+ *
+ * @example
+ * import { Database, QueryBuilder } from 'your-sdk'
+ */
+
+/**
+ * Core execution engine responsible for running SQL queries
+ * through a Pool or transactional PoolClient.
+ *
  * @module QueryExecutor
  */
-export { default as QueryExecutor } from './core/QueryExecutor';
+export { default as QueryExecutor } from './core/QueryExecutor'
+
 /**
- * Re-exports the QueryBuilder class from the builders module.
+ * Fluent SQL builder used to construct SELECT, INSERT,
+ * UPDATE and DELETE statements.
+ *
  * @module QueryBuilder
  */
-export { default as QueryBuilder } from './builders/QueryBuilder';
+export { default as QueryBuilder } from './builders/QueryBuilder'
+
 /**
- * Re-exports the ConditionBuilder class from the builders module.
+ * Builder responsible for composing WHERE conditions
+ * and logical predicates.
+ *
  * @module ConditionBuilder
  */
-export { default as ConditionBuilder } from './builders/ConditionBuilder';
+export { default as ConditionBuilder } from './builders/ConditionBuilder'
+
 /**
- * Re-exports the Database class from the core module.
+ * High-level database facade that integrates executor,
+ * dialect and transaction management.
+ *
  * @module Database
  */
-export { default as Database } from './core/Database';
+export { default as Database } from './core/Database'
+
 /**
- * Re-exports the TransactionManager class from the core module.
+ * Handles transactional lifecycle management
+ * (BEGIN, COMMIT, ROLLBACK).
+ *
  * @module TransactionManager
  */
-export { default as TransactionManager } from './core/TransactionManager';
+export { default as TransactionManager } from './core/TransactionManager'
+
 /**
- * Re-exports the PostgresDialect class from the dialects module.
+ * PostgreSQL dialect implementation responsible for
+ * SQL syntax generation specific to Postgres.
+ *
  * @module PostgresDialect
  */
-export { default as PostgresDialect } from './dialects/PostgresDialect';
+export { default as PostgresDialect } from './dialects/PostgresDialect'
+
 /**
- * Re-exports the Repository class from the orm module.
+ * Base repository abstraction for implementing
+ * data-access patterns on top of QueryExecutor.
+ *
  * @module Repository
  */
-export { default as Repository } from './orm/Repository';
+export { default as Repository } from './orm/Repository'

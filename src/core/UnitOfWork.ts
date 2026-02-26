@@ -1,49 +1,115 @@
-import Repository from "../orm/Repository";
+import Repository from "../orm/Repository"
 
 /**
- * Manages a list of new, dirty, and removed entities for transactional operations.
+ * Implements the Unit of Work pattern.
+ *
+ * Responsibilities:
+ * - Track new entities (to be inserted)
+ * - Track modified entities (to be updated)
+ * - Track removed entities (to be deleted)
+ * - Coordinate persistence operations in a single commit phase
+ *
+ * @remarks
+ * This implementation assumes:
+ * - A single repository instance handles all tracked entities
+ * - The repository methods are idempotent and transactional-safe
+ *
+ * It does not automatically clear state after commit.
  */
-export default class UnitOfWork {
-    private newEntities: any[] = []
-    private dirtyEntities: any[] = []
-    private removedEntities: any[] = []
+export default class UnitOfWork<T = any> {
 
     /**
-     * Registers an entity as new, to be inserted on commit.
-     * @param entity - The entity to register.
+     * Entities scheduled for insertion.
      */
-    registerNew(entity: any) {
+    private newEntities: T[] = []
+
+    /**
+     * Entities scheduled for update.
+     */
+    private dirtyEntities: T[] = []
+
+    /**
+     * Entities scheduled for deletion.
+     */
+    private removedEntities: T[] = []
+
+    /**
+     * Registers an entity for insertion.
+     *
+     * @param entity - The entity instance to persist.
+     *
+     * @remarks
+     * Should be called when an entity is newly created.
+     */
+    registerNew(entity: T): void {
         this.newEntities.push(entity)
     }
 
     /**
-     * Registers an entity as dirty, to be updated on commit.
-     * @param entity - The entity to register.
+     * Registers an entity for update.
+     *
+     * @param entity - The entity instance to update.
+     *
+     * @remarks
+     * Should be called when an existing entity state changes.
      */
-    registerDirty(entity: any) {
+    registerDirty(entity: T): void {
         this.dirtyEntities.push(entity)
     }
 
     /**
-     * Registers an entity as removed, to be deleted on commit.
-     * @param entity - The entity to register.
+     * Registers an entity for deletion.
+     *
+     * @param entity - The entity instance to remove.
+     *
+     * @remarks
+     * Should be called when an entity is marked for removal.
      */
-    registerRemoved(entity: any) {
+    registerRemoved(entity: T): void {
         this.removedEntities.push(entity)
     }
 
     /**
-     * Commits all registered changes (insertions, updates, deletions) using the provided repository.
-     * @param repository - The repository to use for committing changes.
+     * Persists all tracked changes using the provided repository.
+     *
+     * Execution order:
+     * 1. Inserts
+     * 2. Updates
+     * 3. Deletes
+     *
+     * @param repository - Repository responsible for persistence operations.
+     *
+     * @returns Promise that resolves when all operations complete.
+     *
+     * @remarks
+     * - Operations are executed sequentially.
+     * - Does not automatically wrap execution in a transaction.
+     * - Does not clear internal state after commit.
+     *
+     * For atomic consistency, this method should be executed
+     * inside a transaction boundary.
      */
-    async commit(repository: Repository<any>) {
-        for (const e of this.newEntities)
-            await repository.insert(e)
+    async commit(repository: Repository<T>): Promise<void> {
 
-        for (const e of this.dirtyEntities)
-            await repository.update(e)
+        for (const entity of this.newEntities)
+            await repository.insert(entity)
 
-        for (const e of this.removedEntities)
-            await repository.delete(e)
+        for (const entity of this.dirtyEntities)
+            await repository.update(entity)
+
+        for (const entity of this.removedEntities)
+            await repository.delete(entity)
+    }
+
+    /**
+     * Clears all tracked entities.
+     *
+     * @remarks
+     * Useful after a successful commit.
+     */
+    clear(): void {
+        this.newEntities = []
+        this.dirtyEntities = []
+        this.removedEntities = []
     }
 }

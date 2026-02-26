@@ -27,15 +27,51 @@ type ConditionNode = {
     type: 'AND' | 'OR'
     expression: string
 }
+
 /**
- * A builder for constructing SQL WHERE and HAVING clauses.
+ * Fluent builder for constructing SQL WHERE and HAVING clauses.
+ *
+ * Responsibilities:
+ * - Compose structured conditions
+ * - Support nested logical groups
+ * - Bind parameters through ParamContext
+ * - Produce SQL fragments (no execution responsibility)
+ *
+ * @remarks
+ * - Parameter ordering is delegated to ParamContext.
+ * - This class does not sanitize column names.
+ * - Raw expressions must be used cautiously.
  */
 export default class ConditionBuilder {
 
+    /**
+     * Internal ordered list of condition nodes.
+     */
     private parts: ConditionNode[] = []
 
+    /**
+     * Creates a new ConditionBuilder.
+     *
+     * @param ctx - Shared ParamContext used for parameter binding.
+     *
+     * @remarks
+     * The same context should be reused across the full query lifecycle
+     * to maintain placeholder consistency.
+     */
     constructor(private ctx: ParamContext) {}
 
+    /**
+     * Adds conditions using either:
+     * - Object notation
+     * - Nested callback builder
+     *
+     * @param obj - Condition object or nested builder function.
+     * @returns The current builder instance.
+     *
+     * @example
+     * qb.where({ id: 1 })
+     * qb.where({ age: { op: '>=', value: 18 } })
+     */
     where(
         obj: Record<string, any> | ((qb: ConditionBuilder) => void)
     ) {
@@ -81,6 +117,15 @@ export default class ConditionBuilder {
         return this
     }
 
+    /**
+     * Handles operator-specific SQL generation.
+     *
+     * @param key - Column name.
+     * @param op - Comparison operator.
+     * @param value - Value associated with the operator.
+     *
+     * @throws Error if operator is invalid or value shape is incorrect.
+     */
     private handleOperator(key: string, op: Operator, value: any) {
 
         const allowed: Operator[] = [
@@ -143,15 +188,36 @@ export default class ConditionBuilder {
         }
     }
 
+    /**
+     * Adds a condition expression with logical connector.
+     *
+     * @param expression - SQL condition fragment.
+     * @param type - Logical operator (default: AND).
+     */
     private add(expression: string, type: 'AND' | 'OR' = 'AND') {
         this.parts.push({ type, expression })
     }
 
+    /**
+     * Adds a raw SQL expression.
+     *
+     * @param expression - Raw SQL fragment.
+     * @returns The current builder instance.
+     *
+     * @remarks
+     * No validation or sanitization is performed.
+     */
     raw(expression: string) {
         this.add(expression)
         return this
     }
 
+    /**
+     * Creates an AND logical group.
+     *
+     * @param cb - Nested condition callback.
+     * @returns The current builder instance.
+     */
     andGroup(cb: (qb: ConditionBuilder) => void) {
 
         const nested = new ConditionBuilder(this.ctx)
@@ -165,6 +231,12 @@ export default class ConditionBuilder {
         return this
     }
 
+    /**
+     * Creates an OR logical group.
+     *
+     * @param cb - Nested condition callback.
+     * @returns The current builder instance.
+     */
     orGroup(cb: (qb: ConditionBuilder) => void) {
 
         const nested = new ConditionBuilder(this.ctx)
@@ -178,6 +250,12 @@ export default class ConditionBuilder {
         return this
     }
 
+    /**
+     * Creates a shallow clone of the current builder.
+     *
+     * @remarks
+     * Shares the same ParamContext instance.
+     */
     clone(): ConditionBuilder {
 
         const cloned = new ConditionBuilder(this.ctx)
@@ -189,6 +267,15 @@ export default class ConditionBuilder {
         return cloned
     }
 
+    /**
+     * Builds the final SQL clause.
+     *
+     * @param prefix - Clause prefix (default: "WHERE").
+     * @returns SQL fragment or empty string if no conditions exist.
+     *
+     * @example
+     * WHERE id = $1 AND active = $2
+     */
     build(prefix = 'WHERE'): string {
 
         if (!this.parts.length) return ''

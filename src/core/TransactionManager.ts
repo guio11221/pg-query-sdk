@@ -1,21 +1,59 @@
-import {Pool, PoolClient} from 'pg'
+import { Pool, PoolClient } from 'pg'
 
 /**
- * Manages database transactions, providing a method to execute a callback within a transaction.
+ * Handles transactional control flow using a PostgreSQL connection pool.
+ *
+ * Responsibilities:
+ * - Acquiring a dedicated PoolClient
+ * - Starting a transaction (BEGIN)
+ * - Committing on success
+ * - Rolling back on failure
+ * - Ensuring proper client release
+ *
+ * @remarks
+ * This class centralizes transaction lifecycle management,
+ * preventing resource leaks and guaranteeing atomic execution.
+ *
+ * It assumes the underlying driver follows standard SQL
+ * transactional semantics.
  */
 export default class TransactionManager {
-    /**
-     * Creates an instance of TransactionManager.
-     * @param pool - The PostgreSQL connection pool to use for transactions.
-     */
-    constructor(private pool: Pool) {
-    }
 
     /**
-     * Executes a given callback function within a database transaction.
-     * The transaction is committed if the callback succeeds, and rolled back if an error occurs.
-     * @param callback - The function to execute within the transaction. It receives a PoolClient instance.
-     * @returns A Promise that resolves to the result of the callback function.
+     * Creates a TransactionManager instance.
+     *
+     * @param pool - PostgreSQL connection pool used to acquire clients.
+     *
+     * @remarks
+     * The provided pool should be a long-lived singleton instance.
+     */
+    constructor(private pool: Pool) {}
+
+    /**
+     * Executes an asynchronous operation within a database transaction.
+     *
+     * Transaction flow:
+     * 1. Acquire client from pool
+     * 2. BEGIN
+     * 3. Execute callback
+     * 4. COMMIT (if successful)
+     * 5. ROLLBACK (if error occurs)
+     * 6. Release client (always)
+     *
+     * @template T - Return type of the callback.
+     *
+     * @param callback - Async function executed inside the transaction.
+     * Receives a transaction-scoped PoolClient.
+     *
+     * @returns The resolved value returned by the callback.
+     *
+     * @throws Rethrows any error produced by the callback
+     * after performing ROLLBACK.
+     *
+     * @example
+     * await transactionManager.transaction(async client => {
+     *   await client.query('INSERT INTO users(name) VALUES($1)', ['John'])
+     * })
      */
     async transaction<T>(
         callback: (trxClient: PoolClient) => Promise<T>
@@ -29,9 +67,18 @@ export default class TransactionManager {
 
             await client.query('COMMIT')
             return result
+
         } catch (error) {
-            await client.query('ROLLBACK')
+
+            try {
+                await client.query('ROLLBACK')
+            } catch {
+                await client.query('ROLLBACK')
+                throw error
+            }
+
             throw error
+
         } finally {
             client.release()
         }
