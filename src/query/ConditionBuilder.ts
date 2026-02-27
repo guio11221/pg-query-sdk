@@ -72,9 +72,7 @@ export default class ConditionBuilder {
      * qb.where({ id: 1 })
      * qb.where({ age: { op: '>=', value: 18 } })
      */
-    where(
-        obj: Record<string, any> | ((qb: ConditionBuilder) => void)
-    ) {
+    where(obj: Record<string, any> | ((qb: ConditionBuilder) => void)) {
 
         if (typeof obj === 'function') {
 

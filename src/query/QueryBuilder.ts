@@ -4,10 +4,7 @@ import QueryExecutor from '../core/QueryExecutor'
 import {Dialect} from '../dialects/Dialect'
 
 type JoinType = 'INNER' | 'LEFT' | 'RIGHT'
-type WhereInput<T> =
-    | Partial<T>
-    | Record<string, any>
-    | Array<Record<string, any>>
+type WhereInput<T> = | Partial<T> | Record<string, any> | Array<Record<string, any>>
 
 /**
  * A fluent SQL query builder for constructing and executing database queries.
@@ -89,6 +86,8 @@ export default class QueryBuilder<T = any> {
      * @returns The current QueryBuilder instance.
      */
     select(fields: (keyof T | string)[] | keyof T | string) {
+        if(!fields) throw new Error('fields on select must be a string')
+
         const normalized = Array.isArray(fields) ? fields : [fields]
         this.fields = normalized.map(String)
         return this
@@ -288,7 +287,6 @@ export default class QueryBuilder<T = any> {
         qb.limitCount = this.limitCount
         qb.offsetCount = this.offsetCount
         qb.ctes = [...this.ctes]
-
         qb.condition = this.condition.clone()
         qb.havingCondition = this.havingCondition.clone()
         qb.ctx = this.ctx.clone()

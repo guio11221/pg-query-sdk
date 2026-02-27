@@ -71,6 +71,7 @@ export default class Database {
      * db.table<User>('users').where('id', 1).first()
      */
     table<T = any>(name: string): QueryBuilder<T> {
+        if(!name) throw new Error('name on table must be a string')
         return new QueryBuilder<T>(
             name,
             this.executor,

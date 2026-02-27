@@ -80,6 +80,7 @@ export default class QueryBuilder<T = any> {
      * @returns The current QueryBuilder instance.
      */
     select(fields: string[]) {
+        if(!fields) throw new Error('fields on select must be a string')
         this.fields = fields
         return this
     }
