@@ -242,6 +242,21 @@ console.log('SQL Query:', query);   // SELECT * FROM users WHERE id = $1
 console.log('Parameters:', params); // [1]
 ```
 
+### `show(): string`
+
+To get only the generated SQL query string without its parameters and without executing it, use the `show()` method. This is particularly useful for debugging or logging the SQL statement.
+
+```typescript
+const sqlString = db.table('products')
+  .select(['name', 'price'])
+  .where({ category: 'electronics' })
+  .limit(5)
+  .show(); // Returns only the SQL string
+
+console.log('Generated SQL String:', sqlString);
+// Example Output: Generated SQL String: SELECT name, price FROM products WHERE category = $1 LIMIT 5
+```
+
 The `QueryBuilder` provides a powerful and flexible way to interact with your database. Combine these methods to construct highly specific and efficient queries for your application.
 
 Next: [Managing Transactions](./usage-transactions.md)
