@@ -353,6 +353,14 @@ export default class QueryBuilder<T = any> {
     }
 
     /**
+     * Returns the SQL query string without executing it.
+     * @returns The SQL query string.
+     */
+    show(): string {
+        return this.build().query
+    }
+
+    /**
      * Executes the built SQL query and returns the results.
      * @returns A Promise that resolves to an array of results of type T.
      */
