@@ -15,7 +15,7 @@
  * referencing internal paths directly.
  *
  * @example
- * import { Database, QueryBuilder } from 'your-sdk'
+ * import { Database, QueryBuilder } from 'pg-query-sdk'
  */
 
 /**
