@@ -69,6 +69,31 @@ async function selectExample() {
 selectExample();
 ```
 
+#### Inspecting the Generated SQL
+
+You can inspect the generated SQL query string without executing it using the `show()` method. This is useful for debugging or logging purposes.
+
+```typescript
+import {Database} from 'pg-query-sdk';
+
+const db = new Database({
+  connectionString: 'postgres://user:pass@localhost:5432/your_database',
+});
+
+function showQueryExample() {
+  const query = db.table('products')
+    .select(['name', 'price'])
+    .where({ category: 'electronics' })
+    .limit(5)
+    .show(); // Call .show() to get the SQL string
+
+  console.log('Generated SQL:', query);
+  // Example Output: Generated SQL: SELECT name, price FROM products WHERE category = $1 LIMIT 5
+}
+
+showQueryExample();
+```
+
 ### 2️⃣ ConditionBuilder: Advanced `WHERE` and `HAVING` Clauses
 
 The `ConditionBuilder` facilitates the creation of complex conditional logic within `WHERE` and `HAVING` clauses, typically used in conjunction with the `QueryBuilder`.
