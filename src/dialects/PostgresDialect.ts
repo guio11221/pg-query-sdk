@@ -48,6 +48,7 @@ export default class PostgresDialect implements Dialect {
      * - Should not be used with untrusted raw input.
      */
     wrapIdentifier(id: string): string {
-        return `"${id}"`
+        const escaped = id.replace(/"/g, '""')
+        return `"${escaped}"`
     }
 }

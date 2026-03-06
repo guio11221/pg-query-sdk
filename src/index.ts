@@ -32,7 +32,7 @@ export { default as QueryExecutor } from './core/QueryExecutor'
  *
  * @module QueryBuilder
  */
-export { default as QueryBuilder } from './builders/QueryBuilder'
+export { default as QueryBuilder } from './query/QueryBuilder'
 
 /**
  * Builder responsible for composing WHERE conditions
@@ -40,7 +40,7 @@ export { default as QueryBuilder } from './builders/QueryBuilder'
  *
  * @module ConditionBuilder
  */
-export { default as ConditionBuilder } from './builders/ConditionBuilder'
+export { default as ConditionBuilder } from './query/ConditionBuilder'
 
 /**
  * High-level database facade that integrates executor,
@@ -65,6 +65,8 @@ export { default as TransactionManager } from './core/TransactionManager'
  * @module PostgresDialect
  */
 export { default as PostgresDialect } from './dialects/PostgresDialect'
+export { default as MysqlDialect } from './dialects/MysqlDialect'
+export type { Dialect } from './dialects/Dialect'
 
 /**
  * Base repository abstraction for implementing

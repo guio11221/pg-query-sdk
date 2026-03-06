@@ -1,7 +1,23 @@
 import { Pool, PoolClient, PoolConfig, QueryResult } from 'pg'
 
 interface ExecutorOptions extends PoolConfig {
-
+    defaultQueryTimeoutMs?: number
+    redactQueryParams?: boolean
+    queryLogger?: {
+        onQueryStart?: (meta: { query: string; params: readonly any[] }) => void
+        onQueryEnd?: (meta: {
+            query: string
+            params: readonly any[]
+            durationMs: number
+            rowCount?: number | null
+        }) => void
+        onQueryError?: (meta: {
+            query: string
+            params: readonly any[]
+            durationMs: number
+            error: unknown
+        }) => void
+    }
 }
 
 /**
@@ -10,6 +26,9 @@ interface ExecutorOptions extends PoolConfig {
 export default class QueryExecutor {
     private pool?: Pool
     private client?: PoolClient
+    private defaultQueryTimeoutMs?: number
+    private redactQueryParams: boolean = true
+    private queryLogger?: ExecutorOptions['queryLogger']
 
     /**
      * Creates an instance of QueryExecutor.
@@ -26,8 +45,19 @@ export default class QueryExecutor {
         }
 
         if (options) {
+            const {
+                defaultQueryTimeoutMs,
+                redactQueryParams,
+                queryLogger,
+                ...poolOptions
+            } = options
+
+            this.defaultQueryTimeoutMs = defaultQueryTimeoutMs
+            this.redactQueryParams = redactQueryParams ?? true
+            this.queryLogger = queryLogger
+
             this.pool = new Pool({
-                ...options
+                ...poolOptions
             })
             return
         }
@@ -48,13 +78,56 @@ export default class QueryExecutor {
     ): Promise<QueryResult> {
 
         const normalized = [...params]
+        const observableParams = this.redactQueryParams
+            ? normalized.map(() => '[REDACTED]')
+            : normalized
+        const startedAt = Date.now()
+        this.queryLogger?.onQueryStart?.({
+            query,
+            params: observableParams
+        })
 
-        if (this.client) {
-            return this.client.query(query, normalized)
-        }
+        const queryConfig = this.defaultQueryTimeoutMs
+            ? {
+                text: query,
+                values: normalized,
+                query_timeout: this.defaultQueryTimeoutMs
+            }
+            : {
+                text: query,
+                values: normalized
+            }
 
-        if (this.pool) {
-            return this.pool.query(query, normalized)
+        try {
+            if (this.client) {
+                const result = await this.client.query(queryConfig)
+                this.queryLogger?.onQueryEnd?.({
+                    query,
+                    params: observableParams,
+                    durationMs: Date.now() - startedAt,
+                    rowCount: result.rowCount
+                })
+                return result
+            }
+
+            if (this.pool) {
+                const result = await this.pool.query(queryConfig)
+                this.queryLogger?.onQueryEnd?.({
+                    query,
+                    params: observableParams,
+                    durationMs: Date.now() - startedAt,
+                    rowCount: result.rowCount
+                })
+                return result
+            }
+        } catch (error) {
+            this.queryLogger?.onQueryError?.({
+                query,
+                params: observableParams,
+                durationMs: Date.now() - startedAt,
+                error
+            })
+            throw error
         }
 
         throw new Error('Executor not initialized')

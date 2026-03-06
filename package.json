@@ -21,7 +21,7 @@
     "build:esm": "tsc -p tsconfig.esm.json",
     "build": "npm run build:cjs && npm run build:esm",
     "lint": "echo \"Add lint later\"",
-    "test": "echo \"Add tests\"",
+    "test": "npm run build:cjs && jest",
     "prepublishOnly": "npm run build"
   },
   "files": [
@@ -57,14 +57,16 @@
   },
   "homepage": "https://github.com/guio11221/pg-query-sdk#readme",
   "license": "MIT",
-  "dependencies": {},
   "peerDependencies": {
     "pg": "^8.0.0"
   },
   "devDependencies": {
-    "typescript": "^5.3.3",
+    "@types/jest": "^30.0.0",
     "@types/node": "^20.10.5",
     "@types/pg": "^8.16.0",
-    "pg": "^8.18.0"
+    "jest": "^30.2.0",
+    "pg": "^8.18.0",
+    "ts-jest": "^29.4.6",
+    "typescript": "^5.3.3"
   }
 }

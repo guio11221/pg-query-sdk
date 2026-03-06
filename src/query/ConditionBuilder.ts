@@ -1,5 +1,5 @@
 import ParamContext from '../core/ParamContext'
-import QueryBuilder from "../builders/QueryBuilder"
+import QueryBuilder from './QueryBuilder'
 
 type Operator =
     | '='
@@ -58,7 +58,10 @@ export default class ConditionBuilder {
      * The same context should be reused across the full query lifecycle
      * to maintain placeholder consistency.
      */
-    constructor(private ctx: ParamContext) {}
+    constructor(
+        private ctx: ParamContext,
+        private wrapIdentifier: (field: string) => string = (field) => field
+    ) {}
 
     /**
      * Adds conditions using either:
@@ -92,7 +95,7 @@ export default class ConditionBuilder {
         Object.entries(obj).forEach(([key, condition]) => {
 
             if (condition === null) {
-                this.add(`${key} IS NULL`)
+                this.add(`${this.wrapIdentifier(key)} IS NULL`)
                 return
             }
 
@@ -104,12 +107,12 @@ export default class ConditionBuilder {
 
                 const { op, value } = condition as any
 
-                this.handleOperator(key, op, value)
+                this.handleOperator(this.wrapIdentifier(key), op, value)
                 return
             }
 
             const placeholder = this.ctx.add(condition)
-            this.add(`${key} = ${placeholder}`)
+            this.add(`${this.wrapIdentifier(key)} = ${placeholder}`)
         })
 
         return this
@@ -256,7 +259,7 @@ export default class ConditionBuilder {
      */
     clone(): ConditionBuilder {
 
-        const cloned = new ConditionBuilder(this.ctx)
+        const cloned = new ConditionBuilder(this.ctx, this.wrapIdentifier)
 
         cloned.parts = this.parts.map(p => ({
             ...p

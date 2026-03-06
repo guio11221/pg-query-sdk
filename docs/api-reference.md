@@ -1,43 +1,125 @@
-# API Reference
+﻿# API Reference
 
-This section provides guidance on accessing the detailed API documentation for the PG Query SDK. While this markdown documentation covers the conceptual understanding and usage examples, a comprehensive API reference is best generated directly from the TypeScript source code.
+Referencia resumida da API publica.
 
-## Generated API Documentation
+## Exports
 
-For the most accurate and up-to-date API reference, including all classes, interfaces, methods, properties, and their respective JSDoc comments, please refer to the **generated documentation**.
-
-Typically, such documentation is generated using tools like [TypeDoc](https://typedoc.org/) or [JSDoc](https://jsdoc.app/) (with TypeScript support).
-
-### How to Generate (Example with TypeDoc)
-
-If you have TypeDoc configured in your project, you can usually generate the API documentation by running a command similar to this in your project's root directory:
-
-```bash
-npx typedoc --out docs/api src/index.ts
+```ts
+import {
+  Database,
+  QueryExecutor,
+  TransactionManager,
+  PostgresDialect,
+  MysqlDialect,
+  Repository,
+} from 'pg-query-sdk'
 ```
 
-This command would:
-*   `npx typedoc`: Execute the TypeDoc tool.
-*   `--out docs/api`: Specify the output directory for the generated documentation (e.g., `pg-query-sdk/docs/api`).
-*   `src/index.ts`: Indicate the entry point(s) for TypeDoc to analyze.
+## Database
 
-After generation, you would find HTML files in the `docs/api` directory that provide a navigable and searchable API reference.
+Construtor:
 
-## Key Modules and Classes
+```ts
+new Database({
+  connectionString,
+  dialect?,
+  defaultCacheTTL?,
+  defaultQueryTimeoutMs?,
+  redactQueryParams?,
+  queryLogger?,
+  ...PoolConfig
+})
+```
 
-The PG Query SDK is structured around several key modules and classes:
+Metodos:
+- `table<T = any>(name: string): QueryBuilder<T>`
+- `transaction<T>(callback: (trxDb: Database) => Promise<T>): Promise<T>`
+- `repository<R>(RepoClass: new (executor, dialect) => R): R`
+- `close(): Promise<void>`
 
-*   **`Database`**: The primary entry point for all database interactions.
-*   **`QueryExecutor`**: Handles the execution of SQL queries and connection pooling.
-*   **`TransactionManager`**: Manages ACID-compliant database transactions.
-*   **`QueryBuilder`**: A fluent interface for constructing `SELECT` queries.
-*   **`ConditionBuilder`**: Used within `QueryBuilder` for complex `WHERE` and `HAVING` clauses.
-*   **`Repository`**: An abstract base class for implementing data access layers (ORMs).
-*   **`Dialect`**: An interface for database-specific syntax, with implementations like `PostgresDialect` and `MysqlDialect`.
-*   **`ParamContext`**: Manages query parameters for safe execution.
+## QueryBuilder<T>
 
-Each of these components, along with their methods, properties, and parameters, is thoroughly documented in the source code using JSDoc, which forms the basis of the generated API reference.
+`QueryBuilder` e obtido principalmente via `db.table('nome_tabela')`.
 
-Please consult the generated API documentation for detailed information on each function signature, parameter type, return value, and usage examples.
+Construcao:
+- `select(fields)`
+- `join(table, localKey, foreignKey)`
+- `leftJoin(table, localKey, foreignKey)`
+- `rightJoin(table, localKey, foreignKey)`
+- `where(obj)`
+- `whereRaw(expression)`
+- `andGroup(cb)`
+- `orGroup(cb)`
+- `groupBy(fields)`
+- `having(obj)`
+- `havingRaw(expression)`
+- `unsafeWhereRaw(expression)`
+- `unsafeHavingRaw(expression)`
+- `unsafeOrderByRaw(expression)`
+- `unsafeJoinRaw(joinClause)`
+- `orderBy(column, direction?)`
+- `limit(value)`
+- `offset(value)`
+- `with(name, subQuery, recursive?)`
+- `fromSubquery(sub, alias)`
+- `distinct()`
+- `union(queryBuilder)`
+- `unionAll(queryBuilder)`
 
-Next: [Contributing](./contributing.md)
+DML/agregacao:
+- `insert(data)`
+- `update(data)`
+- `delete()`
+- `count(column?)`
+- `sum(column)`
+- `avg(column)`
+- `min(column)`
+- `max(column)`
+
+Execucao/inspecao:
+- `build(): { query: string; params: any[] }`
+- `show(): string`
+- `execute(): Promise<T[] | number | null>`
+- `first(): Promise<T | null>`
+- `clone(): QueryBuilder<T>`
+
+## ConditionBuilder
+- `where(obj | fn)`
+- `raw(expression)`
+- `andGroup(cb)`
+- `orGroup(cb)`
+- `build(prefix?)`
+- `clone()`
+
+## QueryExecutor
+
+Construtor:
+
+```ts
+new QueryExecutor(poolConfig?)
+new QueryExecutor(undefined, poolClient)
+```
+
+Metodos:
+- `execute(query: string, params?: readonly any[], cacheTTL?: number)`
+- `getPool()`
+- `getClient()`
+- `close()`
+
+## Repository<T>
+- `qb()`
+- `findById(id: number)`
+- `insert(data)` (placeholder para implementar)
+- `update(data)` (placeholder para implementar)
+- `delete(data)` (placeholder para implementar)
+
+## PostgresDialect
+- `placeholder(index: number): string`
+- `wrapIdentifier(id: string): string`
+
+## MysqlDialect
+- `placeholder(index: number): string`
+- `wrapIdentifier(id: string): string`
+
+Proximo: [Contribuicao](./contributing.md)
+

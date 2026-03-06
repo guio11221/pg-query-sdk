@@ -69,12 +69,10 @@ export default class TransactionManager {
             return result
 
         } catch (error) {
-
             try {
                 await client.query('ROLLBACK')
             } catch {
-                await client.query('ROLLBACK')
-                throw error
+                // Ignore rollback failures and rethrow original error.
             }
 
             throw error

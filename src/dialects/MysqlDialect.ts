@@ -18,6 +18,7 @@ export default class MysqlDialect implements Dialect {
      * @returns The backtick-wrapped identifier.
      */
     wrapIdentifier(id: string) {
-        return `\`${id}\``
+        const escaped = id.replace(/`/g, '``')
+        return `\`${escaped}\``
     }
 }

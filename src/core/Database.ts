@@ -3,7 +3,7 @@ import PostgresDialect from '../dialects/PostgresDialect'
 import QueryExecutor from './QueryExecutor'
 import QueryBuilder from '../query/QueryBuilder'
 import TransactionManager from './TransactionManager'
-import { PoolConfig } from 'pg'
+import { PoolConfig, PoolClient } from 'pg'
 
 /**
  * Configuration object for Database initialization.
@@ -16,6 +16,23 @@ import { PoolConfig } from 'pg'
 interface DatabaseOptions extends PoolConfig {
     dialect?: Dialect
     defaultCacheTTL?: number
+    defaultQueryTimeoutMs?: number
+    redactQueryParams?: boolean
+    queryLogger?: {
+        onQueryStart?: (meta: { query: string; params: readonly any[] }) => void
+        onQueryEnd?: (meta: {
+            query: string
+            params: readonly any[]
+            durationMs: number
+            rowCount?: number | null
+        }) => void
+        onQueryError?: (meta: {
+            query: string
+            params: readonly any[]
+            durationMs: number
+            error: unknown
+        }) => void
+    }
 }
 
 /**
@@ -36,7 +53,7 @@ interface DatabaseOptions extends PoolConfig {
 export default class Database {
     private executor: QueryExecutor
     private dialect: Dialect
-    private transactionManager: TransactionManager
+    private transactionManager?: TransactionManager
     private defaultCacheTTL?: number
 
     /**
@@ -50,13 +67,36 @@ export default class Database {
     constructor(options: DatabaseOptions) {
         this.dialect = options.dialect ?? new PostgresDialect()
 
-        this.executor = new QueryExecutor(options)
+        this.executor = new QueryExecutor({
+            ...options,
+            defaultQueryTimeoutMs: options.defaultQueryTimeoutMs,
+            redactQueryParams: options.redactQueryParams,
+            queryLogger: options.queryLogger
+        })
 
-        this.transactionManager = new TransactionManager(
-            this.executor.getPool()!
-        )
+        const pool = this.executor.getPool()
+        if (pool) {
+            this.transactionManager = new TransactionManager(pool)
+        }
 
         this.defaultCacheTTL = options.defaultCacheTTL
+    }
+
+    /**
+     * Creates a transaction-scoped Database instance that reuses the existing
+     * dialect and cache settings without creating a new connection pool.
+     */
+    private static createTransactionScope(
+        trxClient: PoolClient,
+        dialect: Dialect,
+        defaultCacheTTL?: number
+    ): Database {
+        const scoped = Object.create(Database.prototype) as Database
+        scoped.dialect = dialect
+        scoped.defaultCacheTTL = defaultCacheTTL
+        scoped.executor = new QueryExecutor(undefined, trxClient)
+        scoped.transactionManager = undefined
+        return scoped
     }
 
     /**
@@ -104,20 +144,16 @@ export default class Database {
     async transaction<T>(
         callback: (trxDb: Database) => Promise<T>
     ): Promise<T> {
+        if (!this.transactionManager) {
+            throw new Error('Transactions require a pool-backed Database instance')
+        }
+
         return this.transactionManager.transaction(async trxClient => {
-            const trxExecutor = new QueryExecutor(
-                undefined,
-                trxClient
+            const trxDb = Database.createTransactionScope(
+                trxClient,
+                this.dialect,
+                this.defaultCacheTTL
             )
-
-            const trxDb = new Database({
-                connectionString: '',
-                dialect: this.dialect,
-                defaultCacheTTL: this.defaultCacheTTL
-            })
-
-            trxDb.setExecutor(trxExecutor)
-
             return callback(trxDb)
         })
     }
@@ -153,5 +189,12 @@ export default class Database {
         ) => R
     ): R {
         return new RepoClass(this.executor, this.dialect)
+    }
+
+    /**
+     * Closes the underlying connection pool if this instance is pool-backed.
+     */
+    async close(): Promise<void> {
+        await this.executor.close()
     }
 }

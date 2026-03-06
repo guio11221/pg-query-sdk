@@ -1,262 +1,290 @@
-# Using the QueryBuilder
+﻿# Query Builder
 
-The `QueryBuilder` is a core component of the PG Query SDK, providing a fluent and type-safe interface for constructing SQL `SELECT` queries. It abstracts away the complexities of SQL syntax, allowing you to build dynamic queries programmatically.
+Este guia cobre os metodos do `QueryBuilder` retornado por `db.table(...)`.
 
-## Accessing the QueryBuilder
-
-You can obtain a `QueryBuilder` instance by calling the `table()` method on your `Database` instance, specifying the target table name.
-
-```typescript
-import Database from 'pg-query-sdk';
+```ts
+import { Database, PostgresDialect } from 'pg-query-sdk'
 
 const db = new Database({
-  connectionString: 'postgres://user:pass@localhost:5432/your_database',
-});
-
-// Get a QueryBuilder for the 'users' table
-const userQueryBuilder = db.table('users');
+  connectionString: process.env.DATABASE_URL,
+  dialect: new PostgresDialect(),
+})
 ```
 
-## Basic Select Statements
+## Indice
+- [SELECT](#select)
+- [Filtros WHERE](#filtros-where)
+- [JOIN](#join)
+- [Ordenacao e paginacao](#ordenacao-e-paginacao)
+- [GROUP BY e HAVING](#group-by-e-having)
+- [Agregacoes](#agregacoes)
+- [DML: INSERT UPDATE DELETE](#dml-insert-update-delete)
+- [DISTINCT UNION UNION ALL](#distinct-union-union-all)
+- [CTE e subquery](#cte-e-subquery)
+- [Inspecao de SQL](#inspecao-de-sql)
+- [Execucao e first](#execucao-e-first)
 
-### `select(fields: (keyof T | string)[])`
+## SELECT
 
-Specify the columns you want to retrieve. If `select()` is not called, all columns (`*`) will be selected by default.
+### `select(fields)`
 
-```typescript
-// Select specific columns
-const users = await db.table('users')
+```ts
+const rows = await db
+  .table('users')
   .select(['id', 'name', 'email'])
-  .execute();
-// SELECT id, name, email FROM users
-
-// Select all columns (default behavior if .select() is omitted)
-const allUsers = await db.table('users').execute();
-// SELECT * FROM users
+  .execute()
 ```
 
-## Filtering Data (`WHERE` Clauses)
+Se `select` nao for chamado, o builder usa `SELECT *`.
 
-### `where(obj: Partial<T>)`
+```ts
+const rows = await db.table('users').execute()
+```
 
-Add `WHERE` conditions using an object. Keys correspond to column names, and values are matched for equality.
+## Filtros WHERE
 
-```typescript
-// Simple equality
-const activeUsers = await db.table('users')
+### `where({ campo: valor })`
+
+```ts
+await db.table('users').where({ active: true }).execute()
+```
+
+### Operadores
+
+Suportados: `=`, `>`, `<`, `>=`, `<=`, `!=`, `<>`, `LIKE`, `ILIKE`, `IN`, `NOT IN`, `BETWEEN`, `EXISTS`.
+
+```ts
+await db
+  .table('users')
+  .where({ age: { op: '>=', value: 18 } })
+  .execute()
+
+await db
+  .table('users')
+  .where({ id: { op: 'IN', value: [1, 2, 3] } })
+  .execute()
+
+await db
+  .table('orders')
+  .where({ total: { op: 'BETWEEN', value: [100, 500] } })
+  .execute()
+```
+
+### Nulos
+
+```ts
+await db.table('users').where({ deleted_at: null }).execute()
+```
+
+### `whereRaw(expression)`
+
+```ts
+await db
+  .table('events')
+  .whereRaw("created_at > NOW() - INTERVAL '7 days'")
+  .execute()
+```
+
+Para deixar intencao explicita, voce tambem pode usar `unsafeWhereRaw(...)`.
+
+### Grupos logicos
+
+```ts
+await db
+  .table('users')
   .where({ active: true })
-  .execute();
-// SELECT * FROM users WHERE active = $1
-
-// Null check
-const usersWithoutEmail = await db.table('users')
-  .where({ email: null })
-  .execute();
-// SELECT * FROM users WHERE email IS NULL
-```
-
-### `where(obj: { op: Operator, value: any })` with Operators
-
-For conditions other than equality, you can pass an object with an `op` (operator) and `value`.
-
-```typescript
-const expensiveProducts = await db.table('products')
-  .where({ price: { op: '>', value: 100 } })
-  .execute();
-// SELECT * FROM products WHERE price > $1
-
-const productsLikeName = await db.table('products')
-  .where({ name: { op: 'ILIKE', value: '%apple%' } }) // ILIKE for case-insensitive LIKE
-  .execute();
-// SELECT * FROM products WHERE name ILIKE $1
-```
-
-### `whereRaw(expression: string)`
-
-Add raw SQL expressions to your `WHERE` clause for maximum flexibility. Be cautious with raw expressions to prevent SQL injection; ensure any dynamic values are properly parameterized.
-
-```typescript
-const recentOrders = await db.table('orders')
-  .whereRaw('created_at > NOW() - INTERVAL \'7 days\'')
-  .execute();
-// SELECT * FROM orders WHERE created_at > NOW() - INTERVAL '7 days'
-```
-
-### `andGroup(cb: (qb: ConditionBuilder) => void)` and `orGroup(cb: (qb: ConditionBuilder) => void)`
-
-Group conditions using `AND` or `OR` logic. The callback receives a `ConditionBuilder` instance to define nested conditions.
-
-```typescript
-const complexUsers = await db.table('users')
-  .where(conditions => {
-    conditions
-      .where({ active: true })
-      .andGroup(group => {
-        group
-          .where({ age: { op: '>', value: 18 } })
-          .where({ country: 'USA' });
-      })
-      .orGroup(group => {
-        group
-          .where({ role: 'admin' })
-          .where({ last_login: { op: '<', value: '2023-01-01' } });
-      });
+  .andGroup((g) => {
+    g.where({ role: 'admin' }).orGroup((or) => {
+      or.where({ age: { op: '>=', value: 18 } })
+      or.where({ country: 'BR' })
+    })
   })
-  .execute();
-// SELECT * FROM users WHERE active = $1 AND (age > $2 AND country = $3) OR (role = $4 AND last_login < $5)
+  .execute()
 ```
 
-## Joining Tables
+## JOIN
 
-### `join(table: string, localKey: string, foreignKey: string)` (INNER JOIN)
-### `leftJoin(table: string, localKey: string, foreignKey: string)` (LEFT JOIN)
-### `rightJoin(table: string, localKey: string, foreignKey: string)` (RIGHT JOIN)
+### `join(table, localKey, foreignKey)`
 
-Add join clauses to combine data from multiple tables.
-
-```typescript
-const usersWithOrders = await db.table('users')
-  .select(['users.name', 'orders.order_id', 'orders.amount'])
-  .join('orders', 'users.id', 'orders.user_id')
-  .where({ 'orders.amount': { op: '>', value: 50 } })
-  .execute();
-// SELECT users.name, orders.order_id, orders.amount FROM users INNER JOIN orders ON users.id = orders.user_id WHERE orders.amount > $1
+```ts
+const rows = await db
+  .table('"Instance" ins')
+  .join('"Contact" con', 'con."instanceId"', 'ins.id')
+  .execute()
 ```
 
-## Aggregating Data
+SQL gerado:
 
-### `groupBy(fields: string | string[])`
+```sql
+SELECT * FROM "Instance" "ins" INNER JOIN "Contact" "con" ON "con"."instanceId" = "ins"."id"
+```
 
-Group rows that have the same values in specified columns into summary rows.
+### `leftJoin(...)` e `rightJoin(...)`
 
-```typescript
-const orderCountsByUser = await db.table('orders')
-  .select(['user_id', 'COUNT(order_id) AS total_orders'])
+```ts
+await db
+  .table('users')
+  .leftJoin('orders', 'users.id', 'orders.user_id')
+  .execute()
+```
+
+## Ordenacao e paginacao
+
+```ts
+await db
+  .table('users')
+  .orderBy('created_at', 'DESC')
+  .limit(20)
+  .offset(40)
+  .execute()
+```
+
+Para ordenacao raw:
+
+```ts
+await db.table('users').unsafeOrderByRaw('RANDOM()').execute()
+```
+
+## GROUP BY e HAVING
+
+```ts
+await db
+  .table('orders')
+  .select(['user_id'])
   .groupBy('user_id')
-  .execute();
-// SELECT user_id, COUNT(order_id) AS total_orders FROM orders GROUP BY user_id
+  .having({ 'COUNT(*)': { op: '>', value: 5 } })
+  .execute()
 ```
 
-### `having(obj: Record<string, any>)` and `havingRaw(expression: string)`
+Tambem existe `havingRaw(...)`.
+Alias explicito: `unsafeHavingRaw(...)`.
 
-Filter groups based on aggregate conditions, similar to `where` but applied after `groupBy`.
+## Agregacoes
 
-```typescript
-const usersWithManyOrders = await db.table('orders')
-  .select(['user_id', 'COUNT(order_id) AS total_orders'])
-  .groupBy('user_id')
-  .having({ 'COUNT(order_id)': { op: '>', value: 5 } })
-  .execute();
-// SELECT user_id, COUNT(order_id) AS total_orders FROM orders GROUP BY user_id HAVING COUNT(order_id) > $1
+Metodos: `count`, `sum`, `avg`, `min`, `max`.
+
+```ts
+const totalUsers = await db.table('users').count().execute()
+const totalSales = await db.table('orders').sum('amount').execute()
+const maxPrice = await db.table('products').max('price').execute()
 ```
 
-## Ordering and Limiting Results
+Retorno: `number | null`.
 
-### `orderBy(column: string, direction: 'ASC' | 'DESC' = 'ASC')`
+## DML: INSERT UPDATE DELETE
 
-Sort the result set by one or more columns.
+### `insert(data)`
 
-```typescript
-const sortedProducts = await db.table('products')
-  .orderBy('price', 'DESC')
-  .orderBy('name', 'ASC')
-  .execute();
-// SELECT * FROM products ORDER BY price DESC, name ASC
+```ts
+const inserted = await db
+  .table('users')
+  .insert({ name: 'Ana', email: 'ana@example.com' })
+  .execute()
+
+console.log(inserted) // rowCount
 ```
 
-### `limit(value: number)`
+### `update(data)` + `where(...)`
 
-Restrict the number of rows returned by the query.
-
-```typescript
-const top10Users = await db.table('users')
-  .limit(10)
-  .execute();
-// SELECT * FROM users LIMIT 10
+```ts
+const updated = await db
+  .table('users')
+  .where({ id: 10 })
+  .update({ name: 'Ana Silva' })
+  .execute()
 ```
 
-### `offset(value: number)`
+### `delete()` + `where(...)`
 
-Skip a specified number of rows before beginning to return rows. Useful for pagination.
-
-```typescript
-const usersPage2 = await db.table('users')
-  .limit(10)
-  .offset(10) // Skips the first 10 users, gets the next 10
-  .execute();
-// SELECT * FROM users LIMIT 10 OFFSET 10
+```ts
+const deleted = await db
+  .table('users')
+  .where({ id: 10 })
+  .delete()
+  .execute()
 ```
 
-## Advanced Query Features
+Atencao: `delete()` sem `where` remove todos os registros.
+Atencao: `insert/update/delete` exigem tabela concreta (sem alias e sem subquery).
 
-### `with(name: string, subQuery: QueryBuilder<any>, recursive = false)` (Common Table Expressions - CTEs)
+## DISTINCT UNION UNION ALL
 
-Define Common Table Expressions (CTEs) to simplify complex queries or perform recursive operations.
+```ts
+await db.table('users').select(['city']).distinct().execute()
+```
 
-```typescript
-const cteExample = await db.table('employees')
-  .with('managers', db.table('employees').where({ role: 'manager' }))
-  .select(['employees.name', 'managers.name AS manager_name'])
+```ts
+const active = db.table('users').select(['id']).where({ active: true })
+const blocked = db.table('users').select(['id']).where({ blocked: true })
+
+const ids = await active.union(blocked).execute()
+```
+
+## CTE e subquery
+
+### `with(name, subQuery, recursive?)`
+
+```ts
+const managers = db.table('employees').where({ role: 'manager' })
+
+const rows = await db
+  .table('employees')
+  .with('managers', managers)
   .join('managers', 'employees.manager_id', 'managers.id')
-  .execute();
-// WITH managers AS (SELECT * FROM employees WHERE role = $1) SELECT employees.name, managers.name AS manager_name FROM employees INNER JOIN managers ON employees.manager_id = managers.id
+  .execute()
 ```
 
-### `fromSubquery(sub: QueryBuilder<any>, alias: string)`
+### `fromSubquery(sub, alias)`
 
-Use a subquery as the main table in your `FROM` clause.
+```ts
+const sub = db.table('orders').select(['user_id']).groupBy('user_id')
 
-```typescript
-const subqueryExample = await db.table('users')
-  .fromSubquery(
-    db.table('orders').select(['user_id', 'SUM(amount) AS total_spent']).groupBy('user_id'),
-    'user_spending'
-  )
-  .select(['users.name', 'user_spending.total_spent'])
-  .join('users', 'users.id', 'user_spending.user_id')
-  .where({ 'user_spending.total_spent': { op: '>', value: 1000 } })
-  .execute();
-// SELECT users.name, user_spending.total_spent FROM (SELECT user_id, SUM(amount) AS total_spent FROM orders GROUP BY user_id) AS user_spending INNER JOIN users ON users.id = user_spending.user_id WHERE user_spending.total_spent > $1
+const rows = await db
+  .table('users')
+  .fromSubquery(sub, 'u_orders')
+  .execute()
 ```
 
-## Executing the Query
+## Inspecao de SQL
 
-### `execute(): Promise<T[]>`
+### `build()`
 
-Once your query is built, call `execute()` to run it against the database and retrieve the results. The method returns a Promise that resolves to an array of objects, where each object represents a row from the result set.
+```ts
+const { query, params } = db
+  .table('users')
+  .where({ id: 1 })
+  .build()
 
-```typescript
-const results = await db.table('my_table').select(['column1']).execute();
-console.log(results); // [{ column1: 'value1' }, { column1: 'value2' }]
+console.log(query)
+console.log(params)
 ```
 
-## Building the Query String
+### `show()`
 
-### `build(): { query: string, params: any[] }`
-
-If you need to inspect the generated SQL query string and its parameters without executing it, use the `build()` method.
-
-```typescript
-const { query, params } = db.table('users').where({ id: 1 }).build();
-console.log('SQL Query:', query);   // SELECT * FROM users WHERE id = $1
-console.log('Parameters:', params); // [1]
+```ts
+const sql = db.table('users').where({ id: 1 }).show()
 ```
 
-### `show(): string`
+## Execucao e first
 
-To get only the generated SQL query string without its parameters and without executing it, use the `show()` method. This is particularly useful for debugging or logging the SQL statement.
+### `execute()`
+- `SELECT`: retorna `T[]`
+- `INSERT/UPDATE/DELETE`: retorna `rowCount` (`number`)
+- agregacao: retorna `number | null`
 
-```typescript
-const sqlString = db.table('products')
-  .select(['name', 'price'])
-  .where({ category: 'electronics' })
-  .limit(5)
-  .show(); // Returns only the SQL string
+### `first()`
 
-console.log('Generated SQL String:', sqlString);
-// Example Output: Generated SQL String: SELECT name, price FROM products WHERE category = $1 LIMIT 5
+```ts
+const user = await db.table('users').where({ id: 1 }).first()
 ```
 
-The `QueryBuilder` provides a powerful and flexible way to interact with your database. Combine these methods to construct highly specific and efficient queries for your application.
+Retorna `T | null`.
 
-Next: [Managing Transactions](./usage-transactions.md)
+## Boas praticas
+- Prefira `where(...)` com parametros ao inves de concatenar SQL.
+- Use `show()` para depurar query gerada.
+- Em operacoes criticas, rode dentro de `db.transaction(...)`.
+- Use `unsafe*Raw` somente com SQL confiavel.
+
+Proximo: [Transacoes](./usage-transactions.md)
+

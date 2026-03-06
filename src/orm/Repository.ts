@@ -1,4 +1,5 @@
-import {QueryBuilder, QueryExecutor} from "../index";
+import QueryBuilder from '../query/QueryBuilder'
+import QueryExecutor from '../core/QueryExecutor'
 import {Dialect} from "../dialects/Dialect";
 
 /**
@@ -37,12 +38,9 @@ export default abstract class Repository<T> {
      * @returns A Promise that resolves to the found entity or null if not found.
      */
     async findById(id: number): Promise<T | null> {
-        const rows = await this.qb()
+        return this.qb()
             .where({id})
-            .limit(1)
-            .execute()
-
-        return rows[0] ?? null
+            .first()
     }
 
     /**
